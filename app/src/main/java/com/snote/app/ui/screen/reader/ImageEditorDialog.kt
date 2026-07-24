@@ -76,11 +76,12 @@ private data class StrokeData(
     val strokeWidth: Float  // 图片像素单位
 )
 
-private enum class EditMode { PEN, CROP, MOVE }
+private enum class TopMode { MARK, CROP }
+private enum class MarkSubMode { PEN, ERASER, MOVE }
 
 private enum class CropHandle {
     NONE, TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT,
-    TOP, BOTTOM, LEFT, RIGHT, CENTER
+    TOP, BOTTOM, LEFT, RIGHT
 }
 
 // ==================== 主组件 ====================
@@ -118,7 +119,10 @@ fun ImageEditorDialog(
     val imgHeightDp: Dp = with(density) { imgHeight.toDp() }
 
     // ---- 编辑模式 ----
-    var editMode by remember { mutableStateOf(EditMode.PEN) }
+    var topMode by remember { mutableStateOf(TopMode.MARK) }
+    var markSubMode by remember { mutableStateOf(MarkSubMode.PEN) }
+    var showPenOptions by remember { mutableStateOf(true) }
+    var showEraserOptions by remember { mutableStateOf(false) }
 
     // ---- 笔画状态（基于图片原始坐标）----
     var strokes by remember { mutableStateOf(emptyList<StrokeData>()) }
@@ -133,7 +137,6 @@ fun ImageEditorDialog(
     // ---- 画笔设置 ----
     var currentPenColor by remember { mutableStateOf(Color(0xFFE53935)) }
     var currentStrokeWidth by remember { mutableStateOf(6f) }
-    var isEraserActive by remember { mutableStateOf(false) }
     var eraserSize by remember { mutableStateOf(20f) }       // 图片像素单位
     var eraserScreenPos by remember { mutableStateOf<Offset?>(null) }
 
@@ -305,119 +308,124 @@ fun ImageEditorDialog(
                 .onGloballyPositioned { coords ->
                     containerSize = Size(coords.size.width.toFloat(), coords.size.height.toFloat())
                 }
-                .pointerInput(editMode, isEraserActive) {
-                    when (editMode) {
-                        EditMode.PEN -> {
-                            if (isEraserActive) {
-                                // 手动 awaitEachGesture：按下立即响应，无 touch slop 延迟
-                                awaitEachGesture {
-                                    val down = awaitFirstDown()
-                                    down.consume()
-                                    pushUndo()
-                                    eraserScreenPos = down.position
-                                    val imgPos = screenToImage(down.position)
-                                    strokes = eraseStrokes(imgPos, strokes, eraserSize)
+                .pointerInput(topMode, markSubMode) {
+                    when (topMode) {
+                        TopMode.MARK -> {
+                            when (markSubMode) {
+                                MarkSubMode.ERASER -> {
+                                    // 橡皮擦：单指擦除，双指禁用
+                                    awaitEachGesture {
+                                        val down = awaitFirstDown()
+                                        down.consume()
+                                        pushUndo()
+                                        eraserScreenPos = down.position
+                                        val imgPos = screenToImage(down.position)
+                                        strokes = eraseStrokes(imgPos, strokes, eraserSize)
 
-                                    var dragging = true
-                                    while (dragging) {
-                                        val event = awaitPointerEvent()
-                                        val ch = event.changes.firstOrNull { it.pressed }
-                                        if (ch == null) {
-                                            dragging = false
-                                            eraserScreenPos = null
-                                        } else {
-                                            eraserScreenPos = ch.position
-                                            val imgPos2 = screenToImage(ch.position)
-                                            strokes = eraseStrokes(imgPos2, strokes, eraserSize)
-                                            ch.consume()
+                                        var dragging = true
+                                        while (dragging) {
+                                            val event = awaitPointerEvent()
+                                            val ch = event.changes.firstOrNull { it.pressed }
+                                            if (ch == null) {
+                                                dragging = false
+                                                eraserScreenPos = null
+                                            } else {
+                                                eraserScreenPos = ch.position
+                                                val imgPos2 = screenToImage(ch.position)
+                                                strokes = eraseStrokes(imgPos2, strokes, eraserSize)
+                                                ch.consume()
+                                            }
                                         }
                                     }
                                 }
-                            } else {
-                                // 手动 awaitEachGesture：按下立即画第一点，支持单点描点
-                                awaitEachGesture {
-                                    val down = awaitFirstDown()
-                                    down.consume()
-                                    currentPoints.clear()
-                                    currentPoints.add(screenToImage(down.position))
+                                MarkSubMode.PEN -> {
+                                    // 画笔：单指绘制，双指禁用
+                                    awaitEachGesture {
+                                        val down = awaitFirstDown()
+                                        down.consume()
+                                        currentPoints.clear()
+                                        currentPoints.add(screenToImage(down.position))
 
-                                    var dragging = true
-                                    while (dragging) {
-                                        val event = awaitPointerEvent()
-                                        val ch = event.changes.firstOrNull { it.pressed }
-                                        if (ch == null) {
-                                            dragging = false
-                                        } else {
-                                            currentPoints.add(screenToImage(ch.position))
-                                            ch.consume()
+                                        var dragging = true
+                                        while (dragging) {
+                                            val event = awaitPointerEvent()
+                                            val ch = event.changes.firstOrNull { it.pressed }
+                                            if (ch == null) {
+                                                dragging = false
+                                            } else {
+                                                currentPoints.add(screenToImage(ch.position))
+                                                ch.consume()
+                                            }
                                         }
-                                    }
 
-                                    // 抬起时完成笔画（单点也生成一个圆点笔画）
-                                    if (currentPoints.size >= 2) {
-                                        pushUndo()
-                                        strokes = strokes + StrokeData(
-                                            currentPoints.toList(),
-                                            currentPenColor,
-                                            currentStrokeWidth
-                                        )
-                                    } else if (currentPoints.size == 1) {
-                                        pushUndo()
-                                        val p = currentPoints[0]
-                                        strokes = strokes + StrokeData(
-                                            listOf(p, p),
-                                            currentPenColor,
-                                            currentStrokeWidth
-                                        )
+                                        if (currentPoints.size >= 2) {
+                                            pushUndo()
+                                            strokes = strokes + StrokeData(
+                                                currentPoints.toList(),
+                                                currentPenColor,
+                                                currentStrokeWidth
+                                            )
+                                        } else if (currentPoints.size == 1) {
+                                            pushUndo()
+                                            val p = currentPoints[0]
+                                            strokes = strokes + StrokeData(
+                                                listOf(p, p),
+                                                currentPenColor,
+                                                currentStrokeWidth
+                                            )
+                                        }
+                                        currentPoints.clear()
                                     }
-                                    currentPoints.clear()
+                                }
+                                MarkSubMode.MOVE -> {
+                                    // 移动模式：单指平移，双指缩放+平移
+                                    detectTransformGestures { centroid, pan, zoom, _ ->
+                                        val oldScale = viewScale
+                                        viewScale = (viewScale * zoom).coerceIn(0.3f, 8f)
+                                        val ratio = viewScale / oldScale
+                                        viewOffsetX = centroid.x - (centroid.x - viewOffsetX) * ratio
+                                        viewOffsetY = centroid.y - (centroid.y - viewOffsetY) * ratio
+                                        viewOffsetX += pan.x
+                                        viewOffsetY += pan.y
+                                    }
                                 }
                             }
                         }
-
-                        EditMode.MOVE -> {
-                            detectTransformGestures { centroid, pan, zoom, rot ->
-                                // 以手势中心点为锚点进行缩放
-                                val oldScale = viewScale
-                                viewScale = (viewScale * zoom).coerceIn(0.3f, 8f)
-                                val ratio = viewScale / oldScale
-                                viewOffsetX = centroid.x - (centroid.x - viewOffsetX) * ratio
-                                viewOffsetY = centroid.y - (centroid.y - viewOffsetY) * ratio
-                                // 叠加平移
-                                viewOffsetX += pan.x
-                                viewOffsetY += pan.y
-                            }
-                        }
-
-                        EditMode.CROP -> {
+                        TopMode.CROP -> {
                             awaitEachGesture {
                                 val down = awaitFirstDown()
                                 val cr = cropRect ?: return@awaitEachGesture
 
-                                // 触摸点转图片坐标，检测手柄
                                 val touchImg = screenToImage(down.position)
                                 val thresholdImg = screenDistToImage(48f)
                                 val handle = detectCropHandle(touchImg, cr, thresholdImg)
 
                                 if (handle != CropHandle.NONE) {
+                                    // 触碰在裁切框边缘/角落 → 调整裁切框大小
                                     val imageBounds = Rect(0f, 0f, imgWidth, imgHeight)
                                     var currentCr = cr
                                     do {
                                         val event = awaitPointerEvent()
                                         val ch = event.changes.firstOrNull { it.pressed } ?: break
-                                        // 增量也转成图片坐标空间
                                         val deltaScreen = ch.position - ch.previousPosition
                                         val deltaImg = Offset(
                                             deltaScreen.x / viewScale,
                                             deltaScreen.y / viewScale
                                         )
-                                        currentCr = if (handle == CropHandle.CENTER) {
-                                            moveCropRect(currentCr, deltaImg.x, deltaImg.y, imageBounds)
-                                        } else {
-                                            adjustCropRect(currentCr, handle, deltaImg, imageBounds, 8f)
-                                        }
+                                        currentCr = adjustCropRect(currentCr, handle, deltaImg, imageBounds, 8f)
                                         cropRect = currentCr
                                     } while (true)
+                                } else {
+                                    // 触碰在裁切框外 → 移动图片
+                                    detectTransformGestures { centroid, pan, zoom, _ ->
+                                        val oldScale = viewScale
+                                        viewScale = (viewScale * zoom).coerceIn(0.3f, 8f)
+                                        val ratio = viewScale / oldScale
+                                        viewOffsetX = centroid.x - (centroid.x - viewOffsetX) * ratio
+                                        viewOffsetY = centroid.y - (centroid.y - viewOffsetY) * ratio
+                                        viewOffsetX += pan.x
+                                        viewOffsetY += pan.y
+                                    }
                                 }
                             }
                         }
@@ -486,7 +494,7 @@ fun ImageEditorDialog(
                 }
 
                 // 3. 裁切框层
-                if (editMode == EditMode.CROP && cropRect != null) {
+                if (topMode == TopMode.CROP && cropRect != null) {
                     val cr = cropRect!!
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         // 四周半透明遮罩（分四块绘制，避免使用 BlendMode.Clear）
@@ -560,7 +568,7 @@ fun ImageEditorDialog(
             }
 
             // 橡皮擦预览（屏幕坐标空间，不参与变换）
-            if (isEraserActive && eraserScreenPos != null) {
+            if (topMode == TopMode.MARK && markSubMode == MarkSubMode.ERASER && eraserScreenPos != null) {
                 Canvas(Modifier.fillMaxSize()) {
                     drawCircle(
                         Color.White.copy(alpha = 0.45f),
@@ -612,7 +620,8 @@ fun ImageEditorDialog(
                 Text("编辑图片", color = Color.White, style = MaterialTheme.typography.titleMedium)
                 TextButton(onClick = {
                     val hasCrop = cropRect != null && cropRect!!.width > 5f && cropRect!!.height > 5f
-                    if (strokes.isEmpty() && !hasCrop && rotationAngle == 0f) {
+                    val hasRotation = rotationAngle != 0f
+                    if (strokes.isEmpty() && !hasCrop && !hasRotation) {
                         onDismiss()
                         return@TextButton
                     }
@@ -672,67 +681,81 @@ fun ImageEditorDialog(
                 )
             ) {
                 Column {
+                    // 面板内容（按模式切换）
                     AnimatedContent(
-                        targetState = editMode,
+                        targetState = topMode,
                         transitionSpec = {
                             (slideInVertically { it / 2 } +
                                 fadeIn(spring(dampingRatio = 0.6f, stiffness = 450f))) togetherWith
                                 (slideOutVertically { it / 2 } +
                                     fadeOut(spring(dampingRatio = 0.7f, stiffness = 350f)))
                         },
-                        label = "editMode"
+                        label = "topMode"
                     ) { mode ->
                         when (mode) {
-                            EditMode.PEN -> Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    ColorPicker(penColors, currentPenColor) {
-                                        currentPenColor = it
-                                        isEraserActive = false
+                            TopMode.MARK -> {
+                                Column {
+                                    // 画笔选项面板（点击画笔按钮展开/收起）
+                                    AnimatedVisibility(
+                                        visible = markSubMode == MarkSubMode.PEN && showPenOptions,
+                                        enter = slideInVertically { it / 2 } + fadeIn(),
+                                        exit = slideOutVertically { it / 2 } + fadeOut()
+                                    ) {
+                                        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                            ColorPicker(penColors, currentPenColor) {
+                                                currentPenColor = it
+                                            }
+                                            Spacer(Modifier.height(6.dp))
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text("笔画粗细", color = Color.White, fontSize = 12.sp)
+                                                Spacer(Modifier.width(8.dp))
+                                                CustomSlider(
+                                                    value = currentStrokeWidth,
+                                                    onValueChange = { currentStrokeWidth = it },
+                                                    valueRange = 1f..25f,
+                                                    modifier = Modifier.weight(1f),
+                                                    thumbColor = currentPenColor,
+                                                    activeTrackColor = currentPenColor
+                                                )
+                                                Spacer(Modifier.width(10.dp))
+                                                Box(
+                                                    Modifier.size(20.dp).clip(CircleShape)
+                                                        .background(currentPenColor)
+                                                )
+                                            }
+                                        }
                                     }
-                                    IconButton(onClick = { isEraserActive = !isEraserActive }) {
-                                        Icon(
-                                            Icons.Rounded.AutoFixHigh, "橡皮擦",
-                                            tint = if (isEraserActive) themeColor else Color.White.copy(alpha = 0.7f),
-                                            modifier = Modifier.size(22.dp)
-                                        )
+
+                                    // 橡皮擦选项面板（点击橡皮擦按钮展开/收起）
+                                    AnimatedVisibility(
+                                        visible = markSubMode == MarkSubMode.ERASER && showEraserOptions,
+                                        enter = slideInVertically { it / 2 } + fadeIn(),
+                                        exit = slideOutVertically { it / 2 } + fadeOut()
+                                    ) {
+                                        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text("橡皮大小", color = Color.White, fontSize = 12.sp)
+                                                Spacer(Modifier.width(8.dp))
+                                                CustomSlider(
+                                                    value = eraserSize,
+                                                    onValueChange = { eraserSize = it },
+                                                    valueRange = 5f..50f,
+                                                    modifier = Modifier.weight(1f),
+                                                    thumbColor = Color.White,
+                                                    activeTrackColor = Color.White
+                                                )
+                                                Spacer(Modifier.width(10.dp))
+                                                Box(
+                                                    Modifier.size(20.dp).clip(CircleShape)
+                                                        .background(Color.Transparent)
+                                                        .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+                                                )
+                                            }
+                                        }
                                     }
-                                }
-                                Spacer(Modifier.height(6.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        if (isEraserActive) "橡皮大小" else "笔画粗细",
-                                        color = Color.White, fontSize = 12.sp
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    CustomSlider(
-                                        value = if (isEraserActive) eraserSize else currentStrokeWidth,
-                                        onValueChange = { v ->
-                                            if (isEraserActive) eraserSize = v
-                                            else currentStrokeWidth = v
-                                        },
-                                        valueRange = if (isEraserActive) 5f..50f else 1f..25f,
-                                        modifier = Modifier.weight(1f),
-                                        thumbColor = if (isEraserActive) Color.White else currentPenColor,
-                                        activeTrackColor = if (isEraserActive) Color.White else currentPenColor
-                                    )
-                                    Spacer(Modifier.width(10.dp))
-                                    Box(
-                                        Modifier.size(20.dp).clip(CircleShape)
-                                            .background(if (isEraserActive) Color.Transparent else currentPenColor)
-                                            .border(
-                                                if (isEraserActive) 1.dp else 0.dp,
-                                                Color.White.copy(alpha = 0.5f),
-                                                CircleShape
-                                            )
-                                    )
                                 }
                             }
-
-                            EditMode.MOVE -> Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                            TopMode.CROP -> Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                                 Text("旋转: ${rotationAngle.toInt()}°", color = Color.White, fontSize = 12.sp)
                                 CustomSlider(
                                     value = rotationAngle,
@@ -757,8 +780,10 @@ fun ImageEditorDialog(
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     TextButton(onClick = {
+                                        rotationAngle = 0f
+                                        cropRect = Rect(0f, 0f, imgWidth, imgHeight)
                                         if (containerSize.width > 0 && containerSize.height > 0) {
-                                            val rad = Math.toRadians(rotationAngle.toDouble())
+                                            val rad = Math.toRadians(0.0)
                                             val rotW = imgWidth * cos(rad).toFloat() + imgHeight * sin(rad).toFloat()
                                             val rotH = imgWidth * sin(rad).toFloat() + imgHeight * cos(rad).toFloat()
                                             viewScale = minOf(containerSize.width / rotW, containerSize.height / rotH)
@@ -772,38 +797,60 @@ fun ImageEditorDialog(
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Spacer(Modifier.width(4.dp))
-                                        Text("适应屏幕", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+                                        Text("还原", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
                                     }
                                 }
-                            }
-
-                            EditMode.CROP -> Column(Modifier.padding(horizontal = 12.dp, vertical = 12.dp)) {
-                                Text(
-                                    "拖动边框调整范围，拖动中间移动位置",
-                                    color = Color.White.copy(alpha = 0.7f),
-                                    fontSize = 12.sp
-                                )
                             }
                         }
                     }
 
-                    // 模式切换按钮
+                    // 标记子模式按钮（仅 MARK 模式下显示）
+                    AnimatedVisibility(visible = topMode == TopMode.MARK) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            ModeButton("画笔", Icons.Rounded.Draw, markSubMode == MarkSubMode.PEN, themeColor) {
+                                if (markSubMode == MarkSubMode.PEN) {
+                                    showPenOptions = !showPenOptions
+                                } else {
+                                    markSubMode = MarkSubMode.PEN
+                                    showPenOptions = true
+                                    showEraserOptions = false
+                                }
+                            }
+                            ModeButton("橡皮擦", Icons.Rounded.AutoFixHigh, markSubMode == MarkSubMode.ERASER, themeColor) {
+                                if (markSubMode == MarkSubMode.ERASER) {
+                                    showEraserOptions = !showEraserOptions
+                                } else {
+                                    markSubMode = MarkSubMode.ERASER
+                                    showEraserOptions = true
+                                    showPenOptions = false
+                                }
+                            }
+                            ModeButton("移动", Icons.Rounded.OpenWith, markSubMode == MarkSubMode.MOVE, themeColor) {
+                                markSubMode = MarkSubMode.MOVE
+                                showPenOptions = false
+                                showEraserOptions = false
+                            }
+                        }
+                    }
+
+                    // 顶层模式切换按钮
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        ModeButton("手写笔", Icons.Rounded.Draw, editMode == EditMode.PEN, themeColor) {
-                            editMode = EditMode.PEN
+                        ModeButton("标记", Icons.Rounded.Edit, topMode == TopMode.MARK, themeColor) {
+                            topMode = TopMode.MARK
                         }
-                        ModeButton("裁切", Icons.Rounded.Crop, editMode == EditMode.CROP, themeColor) {
-                            editMode = EditMode.CROP
+                        ModeButton("裁切", Icons.Rounded.Crop, topMode == TopMode.CROP, themeColor) {
+                            topMode = TopMode.CROP
                             if (cropRect == null) {
                                 cropRect = Rect(0f, 0f, imgWidth, imgHeight)
                             }
-                        }
-                        ModeButton("移动", Icons.Rounded.OpenWith, editMode == EditMode.MOVE, themeColor) {
-                            editMode = EditMode.MOVE
                         }
                     }
                 }
@@ -964,10 +1011,6 @@ private fun detectCropHandle(touch: Offset, crop: Rect, threshold: Float): CropH
         touch.y in (crop.top - threshold)..(crop.bottom + threshold)
     ) return CropHandle.RIGHT
 
-    // 内部 → 移动
-    if (touch.x in crop.left..crop.right && touch.y in crop.top..crop.bottom) {
-        return CropHandle.CENTER
-    }
     return CropHandle.NONE
 }
 
