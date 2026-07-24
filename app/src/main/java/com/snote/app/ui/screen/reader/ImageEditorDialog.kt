@@ -484,7 +484,7 @@ fun ImageEditorDialog(
                         translationY = viewOffsetY - size.height / 2f
                         rotationZ = rotationAngle
                     }
-                    .requiredSize(imgWidthDp, imgHeightDp)
+                    .size(imgWidthDp, imgHeightDp)
             ) {
                 // 1. 图片层
                 Image(
