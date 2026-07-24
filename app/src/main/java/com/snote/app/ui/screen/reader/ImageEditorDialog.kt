@@ -114,9 +114,9 @@ fun ImageEditorDialog(
     val imgWidth = originalBitmap.width.toFloat()
     val imgHeight = originalBitmap.height.toFloat()
 
-    // 图片原始尺寸转 Dp（使用 Double 精度避免浮点误差导致比例失真）
-    val imgWidthDp: Dp = (imgWidth.toDouble() / density.density).toFloat().dp
-    val imgHeightDp: Dp = (imgHeight.toDouble() / density.density).toFloat().dp
+    // 图片原始尺寸转 Dp（用于 Compose 布局）
+    val imgWidthDp: Dp = with(density) { imgWidth.toDp() }
+    val imgHeightDp: Dp = with(density) { imgHeight.toDp() }
 
     // ---- 编辑模式 ----
     var topMode by remember { mutableStateOf(TopMode.MARK) }
@@ -474,18 +474,17 @@ fun ImageEditorDialog(
                 }
         ) {
             // ---- 变换层：图片 + 笔画 + 裁切框 统一旋转、缩放、平移 ----
-            Box(
-                Modifier
-                    .graphicsLayer {
-                        transformOrigin = TransformOrigin.Center
-                        scaleX = viewScale
-                        scaleY = viewScale
-                        translationX = viewOffsetX - size.width / 2f
-                        translationY = viewOffsetY - size.height / 2f
-                        rotationZ = rotationAngle
-                    }
-                    .size(imgWidthDp, imgHeightDp)
-            ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier
+                        .graphicsLayer {
+                            transformOrigin = TransformOrigin.Center
+                            scaleX = viewScale
+                            scaleY = viewScale
+                            rotationZ = rotationAngle
+                        }
+                        .requiredSize(imgWidthDp, imgHeightDp)
+                ) {
                 // 1. 图片层
                 Image(
                     bitmap = originalBitmap.asImageBitmap(),
@@ -606,6 +605,7 @@ fun ImageEditorDialog(
                         drawCircle(Color.White, handleR, cr.bottomRight)
                         drawCircle(Color.White, handleR, Offset(cr.left, cr.bottom))
                     }
+                }
                 }
             }
 
