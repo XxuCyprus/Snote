@@ -115,8 +115,8 @@ fun ImageEditorDialog(
     val imgHeight = originalBitmap.height.toFloat()
 
     // 图片原始尺寸转 Dp（使用 Double 精度避免浮点误差导致比例失真）
-    val imgWidthDp: Dp = with(density) { (imgWidth.toDouble() / density).toFloat().dp }
-    val imgHeightDp: Dp = with(density) { (imgHeight.toDouble() / density).toFloat().dp }
+    val imgWidthDp: Dp = with(density) { (imgWidth.toDouble() / density.toDouble()).toFloat().dp }
+    val imgHeightDp: Dp = with(density) { (imgHeight.toDouble() / density.toDouble()).toFloat().dp }
 
     // ---- 编辑模式 ----
     var topMode by remember { mutableStateOf(TopMode.MARK) }
