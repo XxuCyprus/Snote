@@ -492,7 +492,7 @@ fun ImageEditorDialog(
                     bitmap = originalBitmap.asImageBitmap(),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.FillBounds
+                    contentScale = ContentScale.Fit
                 )
 
                 // 2. 笔画层（与图片同尺寸，坐标 1:1 对应图片像素）
