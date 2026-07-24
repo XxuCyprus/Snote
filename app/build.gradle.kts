@@ -6,6 +6,12 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val localProperties = java.util.Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.inputStream())
+}
+
 android {
     namespace = "com.snote.app"
     compileSdk = 35
@@ -16,12 +22,6 @@ android {
         targetSdk = 34
         versionCode = 2
         versionName = "2.0.1"
-    }
-
-    val localProperties = java.util.Properties()
-    val localPropertiesFile = rootProject.file("local.properties")
-    if (localPropertiesFile.exists()) {
-        localProperties.load(localPropertiesFile.inputStream())
     }
 
     signingConfigs {
