@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- 应用内部缓存目录 -->
+    <cache-path name="cache" path="/" />
+    <!-- 应用内部文件目录 -->
+    <files-path name="files" path="/" />
+    <!-- 外部存储 - Documents/Snote/ 数据目录 -->
+    <external-path name="snote_data" path="Documents/Snote/" />
+</paths>

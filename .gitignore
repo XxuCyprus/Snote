@@ -1,0 +1,25 @@
+# Gradle
+.gradle/
+build/
+*.apk
+*.aab
+*.aar
+
+# Local SDK path (contains private paths)
+local.properties
+
+# IDE
+.idea/
+*.iml
+
+# Signing keys (NEVER commit these)
+*.jks
+*.keystore
+
+# Android
+captures/
+.externalNativeBuild/
+
+# OS files
+.DS_Store
+Thumbs.db
