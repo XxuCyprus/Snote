@@ -474,17 +474,22 @@ fun ImageEditorDialog(
                 }
         ) {
             // ---- 变换层：图片 + 笔画 + 裁切框 统一旋转、缩放、平移 ----
+            val containerW = containerSize.width
+            val containerH = containerSize.height
             Box(
                 Modifier
                     .graphicsLayer {
                         transformOrigin = TransformOrigin.Center
                         scaleX = viewScale
                         scaleY = viewScale
-                        translationX = viewOffsetX - size.width / 2f
-                        translationY = viewOffsetY - size.height / 2f
                         rotationZ = rotationAngle
                     }
                     .requiredSize(imgWidthDp, imgHeightDp)
+                    .align(Alignment.Center)
+                    .offset { IntOffset(
+                        (viewOffsetX - containerW / 2f).roundToInt(),
+                        (viewOffsetY - containerH / 2f).roundToInt()
+                    ) }
             ) {
                 // 1. 图片层
                 Image(
@@ -1231,16 +1236,21 @@ private fun composeBitmap(
 ): Bitmap {
     val swOriginal = toSoftwareBitmap(original)
 
-    // 1. 旋转
+    // 1. 旋转（计算旋转后的包围盒，避免黑边）
     val rotated = if (rotationAngle != 0f) {
+        val rad = Math.toRadians(rotationAngle.toDouble())
+        val cosR = kotlin.math.abs(cos(rad))
+        val sinR = kotlin.math.abs(sin(rad))
+        val rotW = (swOriginal.width * cosR + swOriginal.height * sinR).toInt()
+        val rotH = (swOriginal.width * sinR + swOriginal.height * cosR).toInt()
+
+        val result = Bitmap.createBitmap(rotW, rotH, Bitmap.Config.ARGB_8888)
+        val canvas = AndroidCanvas(result)
         val matrix = Matrix().apply {
-            postRotate(rotationAngle, swOriginal.width / 2f, swOriginal.height / 2f)
+            postTranslate((rotW - swOriginal.width) / 2f, (rotH - swOriginal.height) / 2f)
+            postRotate(rotationAngle, rotW / 2f, rotH / 2f)
         }
-        val result = Bitmap.createBitmap(
-            swOriginal, 0, 0,
-            swOriginal.width, swOriginal.height,
-            matrix, true
-        )
+        canvas.drawBitmap(swOriginal, matrix, null)
         swOriginal.recycle()
         result
     } else swOriginal
