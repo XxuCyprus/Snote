@@ -737,34 +737,14 @@ fun ImageEditorDialog(
                             TopMode.MARK -> {
                                 Column {
                                     // 画笔选项面板（点击画笔按钮展开/收起）
-                                    AnimatedVisibility(
-                                        visible = markSubMode == MarkSubMode.PEN && showPenOptions,
-                                        enter = slideInVertically { it / 2 } + fadeIn(),
-                                        exit = slideOutVertically { it / 2 } + fadeOut()
-                                    ) {
-                                        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                                            ColorPicker(penColors, currentPenColor) {
-                                                currentPenColor = it
-                                            }
-                                            Spacer(Modifier.height(6.dp))
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text("笔画粗细", color = Color.White, fontSize = 12.sp)
-                                                Spacer(Modifier.width(8.dp))
-                                                CustomSlider(
-                                                    value = currentStrokeWidth,
-                                                    onValueChange = { currentStrokeWidth = it },
-                                                    valueRange = 1f..25f,
-                                                    modifier = Modifier.weight(1f),
-                                                    thumbColor = currentPenColor,
-                                                    activeTrackColor = currentPenColor
-                                                )
-                                                Spacer(Modifier.width(10.dp))
-                                                Box(
-                                                    Modifier.size(20.dp).clip(CircleShape)
-                                                        .background(currentPenColor)
-                                                )
-                                            }
-                                        }
+                                    if (markSubMode == MarkSubMode.PEN && showPenOptions) {
+                                        PenOptionsPanel(
+                                            penColors = penColors,
+                                            currentPenColor = currentPenColor,
+                                            onColorChange = { currentPenColor = it },
+                                            currentStrokeWidth = currentStrokeWidth,
+                                            onStrokeWidthChange = { currentStrokeWidth = it }
+                                        )
                                     }
 
                                     // 橡皮擦选项面板（点击橡皮擦按钮展开/收起）
@@ -1124,6 +1104,37 @@ private fun ModeButton(
             label, fontSize = 10.sp,
             color = if (active) activeColor else Color.White.copy(alpha = 0.7f)
         )
+    }
+}
+
+@Composable
+private fun PenOptionsPanel(
+    penColors: List<Color>,
+    currentPenColor: Color,
+    onColorChange: (Color) -> Unit,
+    currentStrokeWidth: Float,
+    onStrokeWidthChange: (Float) -> Unit
+) {
+    Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+        ColorPicker(penColors, currentPenColor, onColorChange)
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("笔画粗细", color = Color.White, fontSize = 12.sp)
+            Spacer(Modifier.width(8.dp))
+            CustomSlider(
+                value = currentStrokeWidth,
+                onValueChange = onStrokeWidthChange,
+                valueRange = 1f..25f,
+                modifier = Modifier.weight(1f),
+                thumbColor = currentPenColor,
+                activeTrackColor = currentPenColor
+            )
+            Spacer(Modifier.width(10.dp))
+            Box(
+                Modifier.size(20.dp).clip(CircleShape)
+                    .background(currentPenColor)
+            )
+        }
     }
 }
 
