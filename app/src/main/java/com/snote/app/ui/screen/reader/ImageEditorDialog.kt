@@ -727,31 +727,8 @@ fun ImageEditorDialog(
                                     }
 
                                     // 橡皮擦选项面板（点击橡皮擦按钮展开/收起）
-                                    AnimatedVisibility(
-                                        visible = markSubMode == MarkSubMode.ERASER && showEraserOptions,
-                                        enter = slideInVertically { it / 2 } + fadeIn(),
-                                        exit = slideOutVertically { it / 2 } + fadeOut()
-                                    ) {
-                                        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text("橡皮大小", color = Color.White, fontSize = 12.sp)
-                                                Spacer(Modifier.width(8.dp))
-                                                CustomSlider(
-                                                    value = eraserSize,
-                                                    onValueChange = { eraserSize = it },
-                                                    valueRange = 5f..50f,
-                                                    modifier = Modifier.weight(1f),
-                                                    thumbColor = Color.White,
-                                                    activeTrackColor = Color.White
-                                                )
-                                                Spacer(Modifier.width(10.dp))
-                                                Box(
-                                                    Modifier.size(20.dp).clip(CircleShape)
-                                                        .background(Color.Transparent)
-                                                        .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
-                                                )
-                                            }
-                                        }
+                                    if (markSubMode == MarkSubMode.ERASER && showEraserOptions) {
+                                        EraserOptionsPanel(eraserSize = eraserSize, onEraserSizeChange = { eraserSize = it })
                                     }
                                 }
                             }
@@ -1106,6 +1083,30 @@ private fun ModeButton(
             label, fontSize = 10.sp,
             color = if (active) activeColor else Color.White.copy(alpha = 0.7f)
         )
+    }
+}
+
+@Composable
+private fun EraserOptionsPanel(eraserSize: Float, onEraserSizeChange: (Float) -> Unit) {
+    Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("橡皮大小", color = Color.White, fontSize = 12.sp)
+            Spacer(Modifier.width(8.dp))
+            CustomSlider(
+                value = eraserSize,
+                onValueChange = onEraserSizeChange,
+                valueRange = 5f..50f,
+                modifier = Modifier.weight(1f),
+                thumbColor = Color.White,
+                activeTrackColor = Color.White
+            )
+            Spacer(Modifier.width(10.dp))
+            Box(
+                Modifier.size(20.dp).clip(CircleShape)
+                    .background(Color.Transparent)
+                    .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+            )
+        }
     }
 }
 
