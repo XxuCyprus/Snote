@@ -394,6 +394,7 @@ fun ImageEditorDialog(
                         TopMode.CROP -> {
                             awaitEachGesture {
                                 val down = awaitFirstDown()
+                                down.consume()
                                 val cr = cropRect ?: return@awaitEachGesture
 
                                 val touchImg = screenToImage(down.position)
@@ -414,17 +415,57 @@ fun ImageEditorDialog(
                                         )
                                         currentCr = adjustCropRect(currentCr, handle, deltaImg, imageBounds, 8f)
                                         cropRect = currentCr
+                                        ch.consume()
                                     } while (true)
                                 } else {
-                                    // 触碰在裁切框外 → 移动图片
-                                    detectTransformGestures { centroid, pan, zoom, _ ->
-                                        val oldScale = viewScale
-                                        viewScale = (viewScale * zoom).coerceIn(0.3f, 8f)
-                                        val ratio = viewScale / oldScale
-                                        viewOffsetX = centroid.x - (centroid.x - viewOffsetX) * ratio
-                                        viewOffsetY = centroid.y - (centroid.y - viewOffsetY) * ratio
-                                        viewOffsetX += pan.x
-                                        viewOffsetY += pan.y
+                                    // 触碰在裁切框外 → 手动处理平移和缩放
+                                    var lastPos = down.position
+                                    var lastDist = 0f
+                                    val pointers = mutableListOf(down)
+
+                                    var dragging = true
+                                    while (dragging) {
+                                        val event = awaitPointerEvent()
+                                        val pressed = event.changes.filter { it.pressed }
+
+                                        if (pressed.isEmpty()) {
+                                            dragging = false
+                                        } else if (pressed.size == 1) {
+                                            // 单指：平移
+                                            val ch = pressed[0]
+                                            val pan = ch.position - lastPos
+                                            viewOffsetX += pan.x
+                                            viewOffsetY += pan.y
+                                            lastPos = ch.position
+                                            ch.consume()
+                                        } else if (pressed.size >= 2) {
+                                            // 双指：缩放 + 平移
+                                            val p1 = pressed[0]
+                                            val p2 = pressed[1]
+                                            val centroid = Offset(
+                                                (p1.position.x + p2.position.x) / 2f,
+                                                (p1.position.y + p2.position.y) / 2f
+                                            )
+                                            val dist = (p1.position - p2.position).getDistance()
+
+                                            if (lastDist > 0f) {
+                                                val zoom = dist / lastDist
+                                                val oldScale = viewScale
+                                                viewScale = (viewScale * zoom).coerceIn(0.3f, 8f)
+                                                val ratio = viewScale / oldScale
+                                                viewOffsetX = centroid.x - (centroid.x - viewOffsetX) * ratio
+                                                viewOffsetY = centroid.y - (centroid.y - viewOffsetY) * ratio
+                                            }
+
+                                            val pan = centroid - lastPos
+                                            viewOffsetX += pan.x
+                                            viewOffsetY += pan.y
+
+                                            lastPos = centroid
+                                            lastDist = dist
+                                            p1.consume()
+                                            p2.consume()
+                                        }
                                     }
                                 }
                             }
