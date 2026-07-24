@@ -18,12 +18,18 @@ android {
         versionName = "2.0.1"
     }
 
+    val localProperties = java.util.Properties()
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localProperties.load(localPropertiesFile.inputStream())
+    }
+
     signingConfigs {
         create("release") {
             storeFile = file("snote-release.jks")
-            storePassword = "AndroidAppZ070128Z"
+            storePassword = localProperties.getProperty("storePassword")
             keyAlias = "Snote"
-            keyPassword = "AndroidAppZ070128Z"
+            keyPassword = localProperties.getProperty("keyPassword")
         }
     }
 
