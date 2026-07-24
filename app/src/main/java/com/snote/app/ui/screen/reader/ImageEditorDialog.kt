@@ -114,9 +114,9 @@ fun ImageEditorDialog(
     val imgWidth = originalBitmap.width.toFloat()
     val imgHeight = originalBitmap.height.toFloat()
 
-    // 图片原始尺寸转 Dp（用于 Compose 布局）
-    val imgWidthDp: Dp = with(density) { imgWidth.toDp() }
-    val imgHeightDp: Dp = with(density) { imgHeight.toDp() }
+    // 图片原始尺寸转 Dp（使用 Double 精度避免浮点误差导致比例失真）
+    val imgWidthDp: Dp = with(density) { (imgWidth.toDouble() / density).toFloat().dp }
+    val imgHeightDp: Dp = with(density) { (imgHeight.toDouble() / density).toFloat().dp }
 
     // ---- 编辑模式 ----
     var topMode by remember { mutableStateOf(TopMode.MARK) }
@@ -491,7 +491,7 @@ fun ImageEditorDialog(
                     bitmap = originalBitmap.asImageBitmap(),
                     contentDescription = null,
                     modifier = Modifier.size(imgWidthDp, imgHeightDp),
-                    contentScale = ContentScale.FillBounds
+                    contentScale = ContentScale.Fit
                 )
 
                 // 2. 笔画层（与图片同尺寸，坐标 1:1 对应图片像素）
