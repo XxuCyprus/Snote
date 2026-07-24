@@ -485,19 +485,17 @@ fun ImageEditorDialog(
                         translationY = viewOffsetY - size.height / 2f
                         rotationZ = rotationAngle
                     }
-                    .size(imgWidthDp, imgHeightDp)
             ) {
-                // 1. 图片层
+                // 1. 图片层（精确尺寸，与 Canvas 对齐）
                 Image(
                     bitmap = originalBitmap.asImageBitmap(),
                     contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.None,
-                    alignment = Alignment.TopStart
+                    modifier = Modifier.size(imgWidthDp, imgHeightDp),
+                    contentScale = ContentScale.FillBounds
                 )
 
                 // 2. 笔画层（与图片同尺寸，坐标 1:1 对应图片像素）
-                Canvas(modifier = Modifier.fillMaxSize()) {
+                Canvas(modifier = Modifier.size(imgWidthDp, imgHeightDp)) {
                     strokes.forEach { s ->
                         if (s.points.size >= 2) {
                             val p = Path().apply {
