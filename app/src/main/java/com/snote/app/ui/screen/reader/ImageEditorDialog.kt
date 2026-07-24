@@ -474,17 +474,18 @@ fun ImageEditorDialog(
                 }
         ) {
             // ---- 变换层：图片 + 笔画 + 裁切框 统一旋转、缩放、平移 ----
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Box(
-                    Modifier
-                        .graphicsLayer {
-                            transformOrigin = TransformOrigin.Center
-                            scaleX = viewScale
-                            scaleY = viewScale
-                            rotationZ = rotationAngle
-                        }
-                        .requiredSize(imgWidthDp, imgHeightDp)
-                ) {
+            Box(
+                Modifier
+                    .graphicsLayer {
+                        transformOrigin = TransformOrigin.Center
+                        scaleX = viewScale
+                        scaleY = viewScale
+                        translationX = viewOffsetX - size.width / 2f
+                        translationY = viewOffsetY - size.height / 2f
+                        rotationZ = rotationAngle
+                    }
+                    .requiredSize(imgWidthDp, imgHeightDp)
+            ) {
                 // 1. 图片层
                 Image(
                     bitmap = originalBitmap.asImageBitmap(),
@@ -605,7 +606,6 @@ fun ImageEditorDialog(
                         drawCircle(Color.White, handleR, cr.bottomRight)
                         drawCircle(Color.White, handleR, Offset(cr.left, cr.bottom))
                     }
-                }
                 }
             }
 
