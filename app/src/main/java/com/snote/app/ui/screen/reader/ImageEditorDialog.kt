@@ -537,6 +537,8 @@ fun ImageEditorDialog(
                 // 3. 裁切框层
                 if (topMode == TopMode.CROP && cropRect != null) {
                     val cr = cropRect!!
+                    // 将屏幕像素单位转换为图片像素单位，确保不同分辨率图片的裁切框样式一致
+                    val invScale = 1f / viewScale
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         // 四周半透明遮罩（分四块绘制，避免使用 BlendMode.Clear）
                         val fullW = size.width
@@ -556,13 +558,13 @@ fun ImageEditorDialog(
                             Color.White,
                             cr.topLeft,
                             cr.size,
-                            style = Stroke(width = 5f)
+                            style = Stroke(width = 5f * invScale)
                         )
                         drawRect(
                             themeColor,
                             cr.topLeft,
                             cr.size,
-                            style = Stroke(width = 3f)
+                            style = Stroke(width = 3f * invScale)
                         )
 
                         // 九宫格线
@@ -573,18 +575,18 @@ fun ImageEditorDialog(
                                 Color.White.copy(alpha = 0.7f),
                                 Offset(cr.left + thirdW * k, cr.top),
                                 Offset(cr.left + thirdW * k, cr.bottom),
-                                1.5f
+                                1.5f * invScale
                             )
                             drawLine(
                                 Color.White.copy(alpha = 0.7f),
                                 Offset(cr.left, cr.top + thirdH * k),
                                 Offset(cr.right, cr.top + thirdH * k),
-                                1.5f
+                                1.5f * invScale
                             )
                         }
 
                         // 四边中点拖拽指示圆点
-                        val midIndicatorR = 6f
+                        val midIndicatorR = 6f * invScale
                         val midColor = Color.White.copy(alpha = 0.8f)
                         drawCircle(midColor, midIndicatorR, Offset(cr.center.x, cr.top))
                         drawCircle(midColor, midIndicatorR, Offset(cr.center.x, cr.bottom))
@@ -592,8 +594,8 @@ fun ImageEditorDialog(
                         drawCircle(midColor, midIndicatorR, Offset(cr.right, cr.center.y))
 
                         // 四角把手圆点（加大 + 外圈描边，更醒目）
-                        val handleR = 14f
-                        val handleOuterR = 18f
+                        val handleR = 14f * invScale
+                        val handleOuterR = 18f * invScale
                         // 外圈深色描边
                         drawCircle(Color.Black.copy(alpha = 0.5f), handleOuterR, cr.topLeft)
                         drawCircle(Color.Black.copy(alpha = 0.5f), handleOuterR, Offset(cr.right, cr.top))
