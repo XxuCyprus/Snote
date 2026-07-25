@@ -145,13 +145,8 @@ public class IMGEditActivity extends IMGEditBaseActivity {
 
             runOnUiThread(() -> {
                 if (json != null && !json.isEmpty()) {
-                    // 如果是编辑过的文件（已有裁切），JPEG中已包含涂鸦，不需要恢复
-                    String uriPath = getIntent().getStringExtra(EXTRA_IMAGE_URI);
-                    boolean isEdited = uriPath != null && new java.io.File(uriPath).getName().startsWith("edited_");
-                    if (!isEdited) {
-                        mImgView.deserializeDoodles(json);
-                    }
-                    // 恢复文字贴纸（View坐标直接复原）
+                    mImgView.deserializeDoodles(json);
+                    // 恢复文字贴纸
                     try {
                         org.json.JSONObject root = new org.json.JSONObject(json);
                         if (root.has("stickers")) {
@@ -160,7 +155,6 @@ public class IMGEditActivity extends IMGEditBaseActivity {
                     } catch (Exception e) {
                         Log.e(TAG, "onCreated: failed to restore stickers", e);
                     }
-                    // 强制刷新视图，确保贴纸立即可见
                     mImgView.invalidate();
                     if (!mImgView.isDoodleEmpty()) {
                         mImgView.post(() -> {
@@ -328,8 +322,11 @@ public class IMGEditActivity extends IMGEditBaseActivity {
             // 序列化文字贴纸数据（用于重新编辑时恢复）
             org.json.JSONArray stickerArr = mImgView.serializeStickers();
 
-            // 保存图片（文字贴纸会烧录到JPEG中，内容页可见）
+            // 保存不含贴纸的干净JPEG（贴纸由JSON独立恢复，避免双重显示）
+            java.util.List<me.minetsh.imaging.core.sticker.IMGSticker> stickerBackup =
+                    mImgView.clearStickersForSave();
             Bitmap bitmap = mImgView.saveBitmap();
+            mImgView.restoreStickers(stickerBackup);
 
             if (bitmap == null) {
                 runOnUiThread(() -> {
