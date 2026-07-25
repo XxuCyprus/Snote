@@ -415,13 +415,10 @@ class DataRepository @Inject constructor(
             save()
             // 删除旧的原始照片文件（如果路径不同）
             if (oldPath != newPath) {
-                val oldFile = File(dataDir, oldPath)
-                if (oldFile.exists()) {
-                    oldFile.delete()
-                }
-                // 清理旧文件的伴生文件
-                File(dataDir, "$oldPath.doodles.json").let { if (it.exists()) it.delete() }
+                // 保留旧图片文件（原图），二次编辑时需要加载它作为干净底图
+                // 只清理不需要的伴生文件
                 File(dataDir, "$oldPath.base").let { if (it.exists()) it.delete() }
+                File(dataDir, "$oldPath.strokes").let { if (it.exists()) it.delete() }
             }
         }
     }

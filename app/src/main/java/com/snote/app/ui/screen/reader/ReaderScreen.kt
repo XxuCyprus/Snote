@@ -109,6 +109,7 @@ fun ReaderScreen(
     // 图片编辑器 Activity 启动器
     var pendingEditSavePath by remember { mutableStateOf<String?>(null) }
     var pendingEditItemId by remember { mutableStateOf<String?>(null) }
+    var pendingEditOriginalPath by remember { mutableStateOf<String?>(null) }
     val imageEditLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -119,15 +120,18 @@ fun ReaderScreen(
                 val dataDirPath = viewModel.getAbsolutePath("")
                 val relativePath = savedPath.removePrefix("$dataDirPath/")
                 viewModel.updateImageContent(itemId, relativePath)
-                // 保存涂鸦数据，用于下次重新编辑时恢复撤销/重做
+                // 保存涂鸦数据 + 原图路径，用于下次重新编辑时恢复
                 val doodleJson = result.data?.getStringExtra(IMGEditActivity.EXTRA_DOODLE_JSON)
                 if (doodleJson != null) {
-                    java.io.File(savedPath + ".doodles.json").writeText(doodleJson)
+                    val json = try { org.json.JSONObject(doodleJson) } catch (e: Exception) { org.json.JSONObject() }
+                    json.put("originalPath", pendingEditOriginalPath ?: "")
+                    java.io.File(savedPath + ".doodles.json").writeText(json.toString())
                 }
             }
         }
         pendingEditSavePath = null
         pendingEditItemId = null
+        pendingEditOriginalPath = null
     }
 
     // 章节重命名状态
@@ -370,11 +374,22 @@ fun ReaderScreen(
                             val saveFile = File(parentDir, "edited_${UUID.randomUUID()}.jpg")
                             pendingEditSavePath = saveFile.absolutePath
                             pendingEditItemId = itemId
+
+                            // 查找原图路径：从已有涂鸦 JSON 中获取，首次编辑则为当前路径
+                            val existingJsonFile = File("$path.doodles.json")
+                            val originalPath: String = if (existingJsonFile.exists()) {
+                                try {
+                                    val json = org.json.JSONObject(existingJsonFile.readText())
+                                    val op = json.optString("originalPath", "")
+                                    if (op.isNotEmpty()) op else path
+                                } catch (e: Exception) { path }
+                            } else path
+                            pendingEditOriginalPath = originalPath
+
                             val intent = Intent(context, IMGEditActivity::class.java)
-                                .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, Uri.fromFile(File(path)))
+                                .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, Uri.fromFile(File(originalPath)))
                                 .putExtra(IMGEditActivity.EXTRA_IMAGE_SAVE_PATH, saveFile.absolutePath)
                             // 加载已有涂鸦数据
-                            val existingJsonFile = File("$path.doodles.json")
                             if (existingJsonFile.exists()) {
                                 intent.putExtra(IMGEditActivity.EXTRA_DOODLE_JSON, existingJsonFile.readText())
                             }

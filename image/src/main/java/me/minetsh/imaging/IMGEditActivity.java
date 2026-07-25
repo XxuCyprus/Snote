@@ -14,7 +14,6 @@ import me.minetsh.imaging.core.file.IMGDecoder;
 import me.minetsh.imaging.core.file.IMGFileDecoder;
 import me.minetsh.imaging.core.util.IMGUtils;
 
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -64,24 +63,6 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         }
         if (uri == null) {
             return null;
-        }
-
-        // 如果存在 .base 干净底图，用它来加载（涂鸦通过 JSON 单独恢复）
-        // 先验证 base 文件是有效图片，防止旧代码残留的黑图
-        String uriPath = uri.getPath();
-        if (uriPath != null) {
-            File baseFile = new File(uriPath + ".base");
-            if (baseFile.exists() && baseFile.length() > 0) {
-                BitmapFactory.Options checkOpts = new BitmapFactory.Options();
-                checkOpts.inJustDecodeBounds = true;
-                BitmapFactory.decodeFile(baseFile.getAbsolutePath(), checkOpts);
-                if (checkOpts.outWidth > 0 && checkOpts.outHeight > 0) {
-                    uri = Uri.fromFile(baseFile);
-                } else {
-                    // 无效文件，删除之（下次编辑会重新生成）
-                    baseFile.delete();
-                }
-            }
         }
 
         IMGDecoder decoder = null;
@@ -189,20 +170,6 @@ public class IMGEditActivity extends IMGEditBaseActivity {
                     }
                 }
                 bitmap.recycle();
-
-                // 直接保存原始位图为干净底图（不经 Canvas 渲染，100% 有效）
-                Bitmap sourceBitmap = mImgView.getSourceBitmap();
-                if (sourceBitmap != null) {
-                    try {
-                        File baseFile = new File(path + ".base");
-                        FileOutputStream baseFout = new FileOutputStream(baseFile);
-                        sourceBitmap.compress(Bitmap.CompressFormat.JPEG, 95, baseFout);
-                        baseFout.flush();
-                        baseFout.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
 
                 // 将涂鸦数据放入返回 Intent
                 String doodleJson = mImgView.serializeDoodles();

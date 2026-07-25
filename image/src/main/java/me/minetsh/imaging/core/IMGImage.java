@@ -170,13 +170,6 @@ public class IMGImage {
         onImageChanged();
     }
 
-    /**
-     * 返回加载的原始位图（不含涂鸦/贴纸，编辑过程中不变）
-     */
-    public Bitmap getSourceBitmap() {
-        return mImage;
-    }
-
     public IMGMode getMode() {
         return mMode;
     }
