@@ -412,14 +412,16 @@ public class IMGImage {
 
     /**
      * 序列化文字贴纸为 JSON 数组
-     * 坐标使用和涂鸦完全一样的变换：View→Bitmap（通过 setTranslate+postRotate+postTranslate+postScale）
+     * 坐标使用和涂鸦完全一样的变换：M.setTranslate → M.postRotate → M.postTranslate → M.postScale
      */
     public JSONArray serializeStickers() {
         JSONArray arr = new JSONArray();
         float scale = getScale();
         if (scale <= 0) return arr;
         float invScale = 1f / scale;
-        float rotate = getRotate();
+        float theta = (float) Math.toRadians(-getRotate());
+        float cos = (float) Math.cos(theta);
+        float sin = (float) Math.sin(theta);
         float cx = mClipFrame.centerX();
         float cy = mClipFrame.centerY();
         float fl = mFrame.left;
@@ -429,18 +431,13 @@ public class IMGImage {
             if (sticker instanceof IMGStickerTextView) {
                 IMGStickerTextView tv = (IMGStickerTextView) sticker;
                 try {
-                    // 贴纸中心 View 坐标（和 addPath 的 sx/sy 类似，但无 scroll 偏移）
                     float vx = tv.getX() + tv.getPivotX();
                     float vy = tv.getY() + tv.getPivotY();
-
-                    // 和涂鸦一样的变换：translate → rotate → translate → scale
                     float tx = vx - fl;
                     float ty = vy - ft;
-                    float theta = (float) Math.toRadians(-rotate);
-                    float cos = (float) Math.cos(theta);
-                    float sin = (float) Math.sin(theta);
-                    float rx = (tx * cos - ty * sin + cx * (1 - cos) + cy * sin) * invScale;
-                    float ry = (tx * sin + ty * cos + cy * (1 - cos) - cx * sin) * invScale;
+                    // 和涂鸦 addPath 完全一样的变换
+                    float rx = (tx * cos + ty * sin + cx * (1 - cos) - cy * sin) * invScale;
+                    float ry = (-tx * sin + ty * cos + cy * (1 - cos) + cx * sin) * invScale;
 
                     JSONObject obj = new JSONObject();
                     obj.put("text", tv.getText().toJson());
@@ -500,18 +497,18 @@ public class IMGImage {
 
     /**
      * 更新所有带 tag 的贴纸位置（Bitmap 坐标 → View 坐标）
+     * 逆变换：先 scale，再 translate，再 rotate(+θ)
      * 每次 onDraw 调用，frame 变化时自动更新，确保贴纸跟随图片移动
-     * frame 稳定后（homing 结束）自动停止更新
      */
     public boolean updateStickerPositions(android.widget.FrameLayout parent) {
-        // 检查 frame 是否变化
         if (mFrame.equals(mLastStickerFrame)) return false;
         mLastStickerFrame.set(mFrame);
 
         float scale = getScale();
         if (scale <= 0) return false;
-        float invScale = 1f / scale;
-        float rotate = getRotate();
+        float theta = (float) Math.toRadians(getRotate());
+        float cos = (float) Math.cos(theta);
+        float sin = (float) Math.sin(theta);
         float cx = mClipFrame.centerX();
         float cy = mClipFrame.centerY();
         float fl = mFrame.left;
@@ -525,16 +522,11 @@ public class IMGImage {
                 float[] data = (float[]) tag;
                 float rx = data[0], ry = data[1], sc = data[2];
 
-                // Bitmap → View（逆变换：scale → translate → rotate → translate）
-                float sx = rx * invScale + fl;
-                float sy = ry * invScale + ft;
-                float theta = (float) Math.toRadians(rotate);
-                float cos = (float) Math.cos(theta);
-                float sin = (float) Math.sin(theta);
-                float vx = (sx - fl) * cos - (sy - ft) * sin + fl
-                        + cx * (1 - cos) + cy * sin;
-                float vy = (sx - fl) * sin + (sy - ft) * cos + ft
-                        + cy * (1 - cos) - cx * sin;
+                // Bitmap → View（逆变换）
+                float sx = rx * scale;
+                float sy = ry * scale;
+                float vx = (sx - cx) * cos + (sy - cy) * sin + cx + fl;
+                float vy = -(sx - cx) * sin + (sy - cy) * cos + cy + ft;
 
                 if (child.getWidth() > 0 && child.getHeight() > 0) {
                     child.setPivotX(child.getWidth() / 2f);
