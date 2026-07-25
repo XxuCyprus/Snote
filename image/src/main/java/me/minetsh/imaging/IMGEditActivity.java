@@ -40,44 +40,57 @@ public class IMGEditActivity extends IMGEditBaseActivity {
 
     private static final String TAG = "IMGEdit";
 
+    private android.app.AlertDialog createThemedDialog() {
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        bg.setCornerRadius(16 * getResources().getDisplayMetrics().density);
+        bg.setColor(0xFFFFFFFF);
+        bg.setStroke((int) (1 * getResources().getDisplayMetrics().density), 0xFFE0E0E0);
+
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setGravity(android.view.Gravity.CENTER);
+        int pad = (int) (40 * getResources().getDisplayMetrics().density);
+        layout.setPadding(pad, pad, pad, pad);
+        layout.setBackground(bg);
+        layout.setMinimumWidth((int) (260 * getResources().getDisplayMetrics().density));
+
+        android.widget.ProgressBar progress = new android.widget.ProgressBar(this);
+        progress.getIndeterminateDrawable().setColorFilter(0xFF1565C0, android.graphics.PorterDuff.Mode.SRC_IN);
+        android.widget.LinearLayout.LayoutParams pp = new android.widget.LinearLayout.LayoutParams(
+                (int) (48 * getResources().getDisplayMetrics().density),
+                (int) (48 * getResources().getDisplayMetrics().density));
+        pp.gravity = android.view.Gravity.CENTER;
+        progress.setLayoutParams(pp);
+        layout.addView(progress);
+
+        android.widget.TextView text = new android.widget.TextView(this);
+        text.setGravity(android.view.Gravity.CENTER);
+        text.setTextColor(0xFF333333);
+        text.setTextSize(16);
+        text.setPadding(0, (int) (20 * getResources().getDisplayMetrics().density), 0, 0);
+        text.setId(android.R.id.text1);
+        layout.addView(text);
+
+        return new android.app.AlertDialog.Builder(this)
+                .setView(layout)
+                .setCancelable(false)
+                .create();
+    }
+
     @Override
     public void onCreated() {
         String doodleFilePath = getIntent().getStringExtra(EXTRA_DOODLE_FILE_PATH);
         String doodleJsonFromIntent = getIntent().getStringExtra(EXTRA_DOODLE_JSON);
 
         if (doodleFilePath != null || doodleJsonFromIntent != null) {
-            // Material 风格加载对话框
-            android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
-            layout.setOrientation(android.widget.LinearLayout.VERTICAL);
-            int pad = (int) (32 * getResources().getDisplayMetrics().density);
-            layout.setPadding(pad, pad, pad, pad);
-
-            android.widget.ProgressBar progress = new android.widget.ProgressBar(this);
-            android.widget.LinearLayout.LayoutParams progressParams = new android.widget.LinearLayout.LayoutParams(
-                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-            progressParams.gravity = android.view.Gravity.CENTER;
-            progress.setLayoutParams(progressParams);
-
-            android.widget.TextView text = new android.widget.TextView(this);
-            text.setText("正在恢复编辑记录...");
-            text.setGravity(android.view.Gravity.CENTER);
-            text.setTextColor(0xFF333333);
-            text.setTextSize(16);
-            text.setPadding(0, pad / 2, 0, 0);
-
-            layout.addView(progress);
-            layout.addView(text);
-
-            android.app.AlertDialog loadDialog = new android.app.AlertDialog.Builder(this)
-                    .setView(layout)
-                    .setCancelable(false)
-                    .create();
+            android.app.AlertDialog loadDialog = createThemedDialog();
+            android.widget.TextView tv = (android.widget.TextView) loadDialog.findViewById(android.R.id.text1);
+            if (tv != null) tv.setText("正在恢复编辑记录...");
             loadDialog.show();
 
             final String filePath = doodleFilePath;
             final String jsonFallback = doodleJsonFromIntent;
-            final android.widget.TextView tv = text;
             final long showTime = System.currentTimeMillis();
 
             new Thread(() -> {
@@ -275,32 +288,10 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         // 停止所有动画和回调，防止后台读取冲突
         mImgView.prepareForSave();
 
-        // 构建 Material 风格对话框
-        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
-        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
-        int pad = (int) (32 * getResources().getDisplayMetrics().density);
-        layout.setPadding(pad, pad, pad, pad);
-
-        android.widget.ProgressBar progress = new android.widget.ProgressBar(this);
-        progress.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
-        ((android.widget.LinearLayout.LayoutParams) progress.getLayoutParams()).gravity = android.view.Gravity.CENTER;
-
-        android.widget.TextView text = new android.widget.TextView(this);
-        text.setText("正在保存...");
-        text.setGravity(android.view.Gravity.CENTER);
-        text.setTextColor(0xFF333333);
-        text.setTextSize(16);
-        text.setPadding(0, pad / 2, 0, 0);
-
-        layout.addView(progress);
-        layout.addView(text);
-
-        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(this)
-                .setView(layout)
-                .setCancelable(false)
-                .create();
+        // 主题对话���
+        android.app.AlertDialog dialog = createThemedDialog();
+        android.widget.TextView tv = (android.widget.TextView) dialog.findViewById(android.R.id.text1);
+        if (tv != null) tv.setText("正在保存...");
         dialog.show();
         final long showTime = System.currentTimeMillis();
 

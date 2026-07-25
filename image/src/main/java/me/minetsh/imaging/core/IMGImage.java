@@ -153,6 +153,8 @@ public class IMGImage {
 
     private Matrix M = new Matrix();
 
+    private final Object mLock = new Object();
+
     /**
      * 涂鸦层位图缓存：避免每帧重绘所有路径
      */
@@ -351,62 +353,57 @@ public class IMGImage {
 
     /**
      * 从 JSON 反序列化涂鸦状态（兼容旧格式）
+     * 线程安全：持有 mLock 以防止与 onDrawDoodles() 并发
      */
     public void deserializeDoodles(String json) {
         if (json == null) return;
-        try {
-            JSONObject root = new JSONObject(json);
+        synchronized (mLock) {
+            try {
+                JSONObject root = new JSONObject(json);
 
-            mDoodles = IMGPath.listFromJson(root.getJSONArray("doodles"));
+                mDoodles = IMGPath.listFromJson(root.getJSONArray("doodles"));
 
-            mHistory.clear();
-            mUndoOps.clear();
+                mHistory.clear();
+                mUndoOps.clear();
 
-            if (root.has("undo")) {
-                // 新紧凑格式：从 undo 操作重建历史
-                JSONArray undoArr = root.getJSONArray("undo");
-                // 初始状态：空列表
-                mHistory.add(new ArrayList<IMGPath>());
-                for (int i = 0; i < undoArr.length(); i++) {
-                    JSONObject entry = undoArr.getJSONObject(i);
-                    String type = entry.optString("t", "");
-                    if (type.equals("a")) {
-                        // ADD：从上一个快照 + 新路径 构建下一个快照
-                        IMGPath added = IMGPath.fromJson(entry.getJSONObject("p"));
-                        List<IMGPath> prev = mHistory.get(mHistory.size() - 1);
-                        List<IMGPath> next = new ArrayList<>(prev);
-                        next.add(added);
-                        mHistory.add(next);
-                        mUndoOps.add(null);
-                    } else if (type.equals("e")) {
-                        // ERASE：从快照还原
-                        List<IMGPath> snapshot = IMGPath.listFromJson(entry.getJSONArray("snap"));
-                        mHistory.add(snapshot);
-                        List<IMGPath> removed = IMGPath.listFromJson(entry.getJSONArray("r"));
-                        JSONArray posArr = entry.getJSONArray("pos");
-                        List<Integer> positions = new ArrayList<>();
-                        for (int j = 0; j < posArr.length(); j++) positions.add(posArr.getInt(j));
-                        mUndoOps.add(new UndoOp(removed, positions, snapshot));
+                if (root.has("undo")) {
+                    JSONArray undoArr = root.getJSONArray("undo");
+                    mHistory.add(new ArrayList<IMGPath>());
+                    for (int i = 0; i < undoArr.length(); i++) {
+                        JSONObject entry = undoArr.getJSONObject(i);
+                        String type = entry.optString("t", "");
+                        if (type.equals("a")) {
+                            IMGPath added = IMGPath.fromJson(entry.getJSONObject("p"));
+                            List<IMGPath> prev = mHistory.get(mHistory.size() - 1);
+                            List<IMGPath> next = new ArrayList<>(prev);
+                            next.add(added);
+                            mHistory.add(next);
+                            mUndoOps.add(null);
+                        } else if (type.equals("e")) {
+                            List<IMGPath> snapshot = IMGPath.listFromJson(entry.getJSONArray("snap"));
+                            mHistory.add(snapshot);
+                            List<IMGPath> removed = IMGPath.listFromJson(entry.getJSONArray("r"));
+                            JSONArray posArr = entry.getJSONArray("pos");
+                            List<Integer> positions = new ArrayList<>();
+                            for (int j = 0; j < posArr.length(); j++) positions.add(posArr.getInt(j));
+                            mUndoOps.add(new UndoOp(removed, positions, snapshot));
+                        }
                     }
+                    mHistoryIndex = mHistory.size() - 1;
+                } else if (root.has("history")) {
+                    JSONArray histArr = root.getJSONArray("history");
+                    for (int i = 0; i < histArr.length(); i++) {
+                        mHistory.add(IMGPath.listFromJson(histArr.getJSONArray(i)));
+                    }
+                    mHistoryIndex = root.optInt("historyIndex", mHistory.size() - 1);
+                    for (int i = 0; i < mHistory.size() - 1; i++) mUndoOps.add(null);
+                } else {
+                    mHistory.add(new ArrayList<>(mDoodles));
+                    mHistoryIndex = 0;
                 }
-                // 最终状态应该等于当前 mDoodles
-                mHistoryIndex = mHistory.size() - 1;
-            } else if (root.has("history")) {
-                // 兼容上一版完整快照格式
-                JSONArray histArr = root.getJSONArray("history");
-                for (int i = 0; i < histArr.length(); i++) {
-                    mHistory.add(IMGPath.listFromJson(histArr.getJSONArray(i)));
-                }
-                mHistoryIndex = root.optInt("historyIndex", mHistory.size() - 1);
-                // 重建 mUndoOps（全部标记为 ADD）
-                for (int i = 0; i < mHistory.size() - 1; i++) mUndoOps.add(null);
-            } else {
-                // 无历史：用当前状态初始化
-                mHistory.add(new ArrayList<>(mDoodles));
-                mHistoryIndex = 0;
+            } catch (JSONException e) {
+                Log.e(TAG, "deserializeDoodles failed", e);
             }
-        } catch (JSONException e) {
-            Log.e(TAG, "deserializeDoodles failed", e);
         }
         invalidateDoodlesCache();
     }
@@ -772,53 +769,54 @@ public class IMGImage {
 
     public void onDrawDoodles(Canvas canvas) {
         if (isDoodleEmpty()) return;
+        synchronized (mLock) {
+            canvas.save();
+            float scale = getScale();
+            canvas.translate(mFrame.left, mFrame.top);
+            canvas.scale(scale, scale);
 
-        canvas.save();
-        float scale = getScale();
-        canvas.translate(mFrame.left, mFrame.top);
-        canvas.scale(scale, scale);
+            // 擦除期间：直接绘制所有路径到屏幕，跳过缓存重建
+            if (mEraseSessionActive) {
+                for (IMGPath path : mDoodles) {
+                    path.onDrawDoodle(canvas, mPaint);
+                }
+                canvas.restore();
+                return;
+            }
 
-        // 擦除期间：直接绘制所有路径到屏幕，跳过缓存重建
-        if (mEraseSessionActive) {
+            int imgW = mImage.getWidth();
+            int imgH = mImage.getHeight();
+
+            if (imgW <= 0 || imgH <= 0) {
+                canvas.restore();
+                return;
+            }
+
+            // 按需重建缓存
+            if (mDoodlesCacheDirty || mDoodlesCache == null
+                    || mDoodlesCache.getWidth() != imgW || mDoodlesCache.getHeight() != imgH) {
+                if (mDoodlesCache != null) {
+                    mDoodlesCache.recycle();
+                }
+                mDoodlesCache = Bitmap.createBitmap(imgW, imgH, Bitmap.Config.ARGB_8888);
+                mDoodlesCacheCanvas = new Canvas(mDoodlesCache);
+                mDoodlesCacheDirty = false;
+            } else {
+                // 缓存有效，直接绘制
+                canvas.drawBitmap(mDoodlesCache, 0, 0, null);
+                canvas.restore();
+                return;
+            }
+
+            // 重新渲染缓存
+            mDoodlesCache.eraseColor(Color.TRANSPARENT);
             for (IMGPath path : mDoodles) {
-                path.onDrawDoodle(canvas, mPaint);
+                path.onDrawDoodle(mDoodlesCacheCanvas, mPaint);
             }
-            canvas.restore();
-            return;
-        }
 
-        int imgW = mImage.getWidth();
-        int imgH = mImage.getHeight();
-
-        if (imgW <= 0 || imgH <= 0) {
-            canvas.restore();
-            return;
-        }
-
-        // 按需重建缓存
-        if (mDoodlesCacheDirty || mDoodlesCache == null
-                || mDoodlesCache.getWidth() != imgW || mDoodlesCache.getHeight() != imgH) {
-            if (mDoodlesCache != null) {
-                mDoodlesCache.recycle();
-            }
-            mDoodlesCache = Bitmap.createBitmap(imgW, imgH, Bitmap.Config.ARGB_8888);
-            mDoodlesCacheCanvas = new Canvas(mDoodlesCache);
-            mDoodlesCacheDirty = false;
-        } else {
-            // 缓存有效，直接绘制
             canvas.drawBitmap(mDoodlesCache, 0, 0, null);
             canvas.restore();
-            return;
         }
-
-        // 重新渲染缓存
-        mDoodlesCache.eraseColor(Color.TRANSPARENT);
-        for (IMGPath path : mDoodles) {
-            path.onDrawDoodle(mDoodlesCacheCanvas, mPaint);
-        }
-
-        canvas.drawBitmap(mDoodlesCache, 0, 0, null);
-        canvas.restore();
     }
 
     public void onDrawStickerClip(Canvas canvas) {
