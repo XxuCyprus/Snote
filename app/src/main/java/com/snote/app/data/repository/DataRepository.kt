@@ -371,7 +371,10 @@ class DataRepository @Inject constructor(
         val item = chapter.items.find { it.id == itemId } ?: return@withContext
 
         if (item.type != ContentType.TEXT) {
-            // 检查JSON中是否记录了原图路径，一并删除
+            val contentFile = File(dataDir, item.content)
+            val parentDir = contentFile.parentFile ?: return@withContext
+
+            // 1. 从JSON中读取原图路径并删除
             val jsonFile = File(dataDir, "${item.content}.doodles.json")
             if (jsonFile.exists()) {
                 try {
@@ -382,7 +385,23 @@ class DataRepository @Inject constructor(
                     }
                 } catch (_: Exception) {}
             }
-            // 删除当前文件（及所有伴生文件）
+
+            // 2. 如果不是原图，搜索父目录中的原图并删除
+            if (contentFile.name.startsWith("edited_")) {
+                // 扫描同目录下的所有非edited文件，找到可能的原图
+                parentDir.listFiles()?.forEach { file ->
+                    if (!file.name.startsWith("edited_")
+                        && (file.name.endsWith(".jpg") || file.name.endsWith(".jpeg") || file.name.endsWith(".png"))
+                    ) {
+                        val relativePath = file.absolutePath.removePrefix("${dataDir.absolutePath}/")
+                        if (relativePath != item.content) {
+                            fileManager.deleteFile(dataDir, relativePath)
+                        }
+                    }
+                }
+            }
+
+            // 3. 删除当前文件及所有伴生文件
             fileManager.deleteFile(dataDir, item.content)
         }
 
