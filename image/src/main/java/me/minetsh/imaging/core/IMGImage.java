@@ -271,16 +271,26 @@ public class IMGImage {
     }
 
     public void undoDoodle() {
-        if (mHistoryIndex <= 0) return;
+        Log.d(TAG, "undoDoodle: mHistoryIndex=" + mHistoryIndex + ", mHistory.size=" + mHistory.size());
+        if (mHistoryIndex <= 0) {
+            Log.d(TAG, "undoDoodle: BLOCKED (at beginning)");
+            return;
+        }
         mHistoryIndex--;
         mDoodles = new ArrayList<>(mHistory.get(mHistoryIndex));
+        Log.d(TAG, "undoDoodle: restored to index " + mHistoryIndex + ", doodles=" + mDoodles.size());
         invalidateDoodlesCache();
     }
 
     public void redoDoodle() {
-        if (mHistoryIndex >= mHistory.size() - 1) return;
+        Log.d(TAG, "redoDoodle: mHistoryIndex=" + mHistoryIndex + ", mHistory.size=" + mHistory.size());
+        if (mHistoryIndex >= mHistory.size() - 1) {
+            Log.d(TAG, "redoDoodle: BLOCKED (at end)");
+            return;
+        }
         mHistoryIndex++;
         mDoodles = new ArrayList<>(mHistory.get(mHistoryIndex));
+        Log.d(TAG, "redoDoodle: restored to index " + mHistoryIndex + ", doodles=" + mDoodles.size());
         invalidateDoodlesCache();
     }
 
@@ -400,6 +410,8 @@ public class IMGImage {
                         }
                     }
                     mHistoryIndex = mHistory.size() - 1;
+                    Log.d(TAG, "deserializeDoodles: rebuilt history, size=" + mHistory.size()
+                        + ", mHistoryIndex=" + mHistoryIndex + ", currentDoodles=" + mDoodles.size());
                 } else if (root.has("history")) {
                     JSONArray histArr = root.getJSONArray("history");
                     for (int i = 0; i < histArr.length(); i++) {

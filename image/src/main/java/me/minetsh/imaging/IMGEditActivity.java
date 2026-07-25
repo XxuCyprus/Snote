@@ -157,10 +157,13 @@ public class IMGEditActivity extends IMGEditBaseActivity {
                     }
                     mImgView.invalidate();
                     if (!mImgView.isDoodleEmpty()) {
+                        Log.d(TAG, "onCreated: doodles found, switching to DOODLE mode");
                         mImgView.post(() -> {
                             mImgView.setMode(IMGMode.DOODLE);
                             updateModeUI();
                         });
+                    } else {
+                        Log.d(TAG, "onCreated: no doodles, staying in NONE mode");
                     }
                 }
                 updateDialogText("已恢复 " + count + " 条编辑记录");
@@ -277,18 +280,12 @@ public class IMGEditActivity extends IMGEditBaseActivity {
 
     @Override
     public void onUndoClick() {
-        IMGMode mode = mImgView.getMode();
-        if (mode == IMGMode.DOODLE) {
-            mImgView.undoDoodle();
-        }
+        mImgView.undoDoodle();
     }
 
     @Override
     public void onRedoClick() {
-        IMGMode mode = mImgView.getMode();
-        if (mode == IMGMode.DOODLE) {
-            mImgView.redoDoodle();
-        }
+        mImgView.redoDoodle();
     }
 
     @Override
