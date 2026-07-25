@@ -146,6 +146,15 @@ public class IMGEditActivity extends IMGEditBaseActivity {
             runOnUiThread(() -> {
                 if (json != null && !json.isEmpty()) {
                     mImgView.deserializeDoodles(json);
+                    // 恢复文字贴纸
+                    try {
+                        org.json.JSONObject root = new org.json.JSONObject(json);
+                        if (root.has("stickers")) {
+                            mImgView.deserializeStickers(root.getJSONArray("stickers"));
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "onCreated: failed to restore stickers", e);
+                    }
                     if (!mImgView.isDoodleEmpty()) {
                         mImgView.post(() -> {
                             mImgView.setMode(IMGMode.DOODLE);
@@ -306,7 +315,15 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         final String savePath = path;
         final String jsonPath = path + ".doodles.json";
         new Thread(() -> {
+            // 先将所有贴纸移到背景列表（包括前景中的贴纸）
+            mImgView.prepareForSaveStickers();
+
+            // 序列化文字贴纸数据（用于重新编辑时恢复）
+            org.json.JSONArray stickerArr = mImgView.serializeStickers();
+
+            // 保存图片（文字贴纸会烧录到JPEG中，内容页可见）
             Bitmap bitmap = mImgView.saveBitmap();
+
             if (bitmap == null) {
                 runOnUiThread(() -> {
                     if (mCurrentDialog != null) mCurrentDialog.dismiss();
@@ -317,7 +334,17 @@ public class IMGEditActivity extends IMGEditBaseActivity {
                 return;
             }
 
+            // 序列化涂鸦 + 文字贴纸
             String doodleJson = mImgView.serializeDoodles();
+            try {
+                org.json.JSONObject root = new org.json.JSONObject(doodleJson);
+                if (stickerArr.length() > 0) {
+                    root.put("stickers", stickerArr);
+                }
+                doodleJson = root.toString();
+            } catch (Exception e) {
+                Log.e(TAG, "onDoneClick: failed to merge stickers", e);
+            }
 
             FileOutputStream fout = null;
             try {

@@ -164,20 +164,34 @@ public abstract class IMGStickerView extends ViewGroup implements IMGSticker, Vi
         int maxWidth = 0;
         int childState = 0;
 
+        // 先用 AT_MOST 测量内容View，让文字按自然大小撑开
+        if (mContentView != null && mContentView.getVisibility() != GONE) {
+            int contentWidthSpec = MeasureSpec.makeMeasureSpec(
+                    MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.AT_MOST);
+            int contentHeightSpec = MeasureSpec.makeMeasureSpec(
+                    MeasureSpec.getSize(heightMeasureSpec), MeasureSpec.AT_MOST);
+            mContentView.measure(contentWidthSpec, contentHeightSpec);
+            maxWidth = Math.round(mContentView.getMeasuredWidth() * mContentView.getScaleX());
+            maxHeight = Math.round(mContentView.getMeasuredHeight() * mContentView.getScaleY());
+            childState = mContentView.getMeasuredState();
+        }
+
+        // 锚点按钮用自身大小测量
         for (int i = 0; i < count; i++) {
             final View child = getChildAt(i);
-            if (child.getVisibility() != GONE) {
+            if (child != mContentView && child.getVisibility() != GONE) {
                 child.measure(widthMeasureSpec, heightMeasureSpec);
-
-                maxWidth = Math.round(Math.max(maxWidth, child.getMeasuredWidth() * child.getScaleX()));
-                maxHeight = Math.round(Math.max(maxHeight, child.getMeasuredHeight() * child.getScaleY()));
-
                 childState = combineMeasuredStates(childState, child.getMeasuredState());
             }
         }
 
         maxHeight = Math.max(maxHeight, getSuggestedMinimumHeight());
         maxWidth = Math.max(maxWidth, getSuggestedMinimumWidth());
+
+        // 加上锚点按钮所需的空间（删除按钮在左上角，调整按钮在右下角）
+        int anchorExtra = ANCHOR_SIZE;
+        maxWidth += anchorExtra;
+        maxHeight += anchorExtra;
 
         setMeasuredDimension(resolveSizeAndState(maxWidth, widthMeasureSpec, childState),
                 resolveSizeAndState(maxHeight, heightMeasureSpec, childState << MEASURED_HEIGHT_STATE_SHIFT));

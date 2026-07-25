@@ -16,6 +16,8 @@ import me.minetsh.imaging.core.homing.IMGHoming;
 import me.minetsh.imaging.core.sticker.IMGSticker;
 import me.minetsh.imaging.core.util.IMGUtils;
 
+import me.minetsh.imaging.view.IMGStickerTextView;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -406,6 +408,127 @@ public class IMGImage {
             }
         }
         invalidateDoodlesCache();
+    }
+
+    /**
+     * 序列化文字贴纸为 JSON 数组（存储为图片像素坐标，裁切后位置不变）
+     * 变换链：View 坐标 → Bitmap 坐标（与 saveBitmap 的 canvas 变换一致）
+     */
+    public JSONArray serializeStickers() {
+        JSONArray arr = new JSONArray();
+        float scale = getScale();
+        if (scale <= 0) return arr;
+        float theta = (float) Math.toRadians(-getRotate());
+        float cos = (float) Math.cos(theta);
+        float sin = (float) Math.sin(theta);
+        float cx = mClipFrame.centerX();
+        float cy = mClipFrame.centerY();
+        float ox = mFrame.left;
+        float oy = mFrame.top;
+
+        for (IMGSticker sticker : mBackStickers) {
+            if (sticker instanceof IMGStickerTextView) {
+                IMGStickerTextView tv = (IMGStickerTextView) sticker;
+                try {
+                    // View 坐标（贴纸中心）→ Bitmap 像素坐标
+                    float vx = tv.getX() + tv.getPivotX();
+                    float vy = tv.getY() + tv.getPivotY();
+                    float bx = (vx - ox) / scale;
+                    float by = (vy - oy) / scale;
+                    float rx = bx * cos + by * sin + cx * (1 - cos) - cy * sin;
+                    float ry = -bx * sin + by * cos + cy * (1 - cos) + cx * sin;
+
+                    JSONObject obj = new JSONObject();
+                    obj.put("text", tv.getText().toJson());
+                    obj.put("x", Math.round(rx));
+                    obj.put("y", Math.round(ry));
+                    obj.put("scale", tv.getScale());
+                    obj.put("rotation", tv.getRotation());
+                    arr.put(obj);
+                } catch (JSONException e) {
+                    Log.e(TAG, "serializeStickers failed", e);
+                }
+            }
+        }
+        return arr;
+    }
+
+    /**
+     * 反序列化文字贴纸（在主线程调用，Bitmap 坐标 → View 坐标）
+     */
+    public void deserializeStickers(JSONArray arr, android.content.Context context,
+                                     android.widget.FrameLayout parent) {
+        if (arr == null || arr.length() == 0) return;
+        float scale = getScale();
+        if (scale <= 0) return;
+        float theta = (float) Math.toRadians(getRotate());
+        float cos = (float) Math.cos(theta);
+        float sin = (float) Math.sin(theta);
+        float cx = mClipFrame.centerX();
+        float cy = mClipFrame.centerY();
+        float ox = mFrame.left;
+        float oy = mFrame.top;
+
+        for (int i = 0; i < arr.length(); i++) {
+            try {
+                JSONObject obj = arr.getJSONObject(i);
+                IMGText text = IMGText.fromJson(obj.getJSONObject("text"));
+                float rx = (float) obj.getDouble("x");
+                float ry = (float) obj.getDouble("y");
+                float stickerScale = (float) obj.optDouble("scale", 1.0);
+                float rotation = (float) obj.optDouble("rotation", 0.0);
+
+                // Bitmap 坐标 → View 坐标（逆变换）
+                float bx = rx * cos + ry * sin + cx * (1 - cos) - cy * sin;
+                float by = -rx * sin + ry * cos + cy * (1 - cos) + cx * sin;
+                float vx = bx * scale + ox;
+                float vy = by * scale + oy;
+
+                IMGStickerTextView tv = new IMGStickerTextView(context);
+                tv.setText(text);
+                tv.setScale(stickerScale);
+                tv.setRotation(rotation);
+
+                android.widget.FrameLayout.LayoutParams lp =
+                        new android.widget.FrameLayout.LayoutParams(
+                                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
+                parent.addView(tv, lp);
+                tv.registerCallback((IMGSticker.Callback) parent);
+                addSticker(tv);
+
+                // 设置位置（在 addSticker 之后，此时 pivot 已确定）
+                tv.setX(vx - tv.getPivotX());
+                tv.setY(vy - tv.getPivotY());
+            } catch (JSONException e) {
+                Log.e(TAG, "deserializeStickers failed", e);
+            }
+        }
+    }
+
+    /**
+     * 临时移除所有贴纸（保存干净图片用）
+     */
+    public List<IMGSticker> clearStickersForSave() {
+        List<IMGSticker> backup = new ArrayList<>(mBackStickers);
+        mBackStickers.clear();
+        if (mForeSticker != null) {
+            backup.add(mForeSticker);
+            mForeSticker = null;
+        }
+        return backup;
+    }
+
+    /**
+     * 恢复贴纸
+     */
+    public void restoreStickers(List<IMGSticker> stickers) {
+        if (stickers == null) return;
+        for (IMGSticker s : stickers) {
+            if (!mBackStickers.contains(s)) {
+                mBackStickers.add(s);
+            }
+        }
     }
 
     private boolean mEraseSessionActive = false;

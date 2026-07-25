@@ -50,6 +50,8 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
 
     private IMGHomingAnimator mHomingAnimator;
 
+    private IMGHoming mTargetHoming;
+
     private Pen mPen = new Pen();
 
     private int mPointerCount = 0;
@@ -134,6 +136,7 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
             mHomingAnimator.addUpdateListener(this);
             mHomingAnimator.addListener(this);
         }
+        mTargetHoming = eHoming;
         mHomingAnimator.setHomingValues(sHoming, eHoming);
         mHomingAnimator.start();
     }
@@ -146,6 +149,12 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
 
     public void prepareForSave() {
         removeCallbacks(this);
+        // 只在 homing 动画运行中时才应用目标状态
+        // homing 已结束时 frame 已经正确，不需要额外操作
+        if (isHoming() && mTargetHoming != null) {
+            mImage.setScale(mTargetHoming.scale);
+            mImage.setRotate(mTargetHoming.rotate);
+        }
         stopHoming();
     }
 
@@ -225,6 +234,26 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
 
     public void deserializeDoodles(String json) {
         mImage.deserializeDoodles(json);
+    }
+
+    public void prepareForSaveStickers() {
+        mImage.stickAll();
+    }
+
+    public org.json.JSONArray serializeStickers() {
+        return mImage.serializeStickers();
+    }
+
+    public void deserializeStickers(org.json.JSONArray arr) {
+        mImage.deserializeStickers(arr, getContext(), this);
+    }
+
+    public java.util.List<me.minetsh.imaging.core.sticker.IMGSticker> clearStickersForSave() {
+        return mImage.clearStickersForSave();
+    }
+
+    public void restoreStickers(java.util.List<me.minetsh.imaging.core.sticker.IMGSticker> stickers) {
+        mImage.restoreStickers(stickers);
     }
 
     public void clearDoodlesTemporarily() {
@@ -661,6 +690,8 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         if (DEBUG) {
             Log.d(TAG, "onAnimationEnd");
         }
+        // 清除目标值，防止后续 prepareForSave 使用过期的目标
+        mTargetHoming = null;
         if (mImage.onHomingEnd(getScrollX(), getScrollY(), mHomingAnimator.isRotate())) {
             toApplyHoming(mImage.clip(getScrollX(), getScrollY()));
         }
