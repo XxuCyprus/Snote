@@ -582,19 +582,20 @@ public class IMGImage {
 
     public void eraseEnd() {
         if (mEraseSessionActive && mEraseStrokeStarted && !mEraseRemoved.isEmpty()) {
-            // 将当前 undoOp（null占位）替换为 ERASE 操作
             int idx = mHistoryIndex;
-            if (idx >= 0 && idx < mUndoOps.size()) {
-                mUndoOps.set(idx, new UndoOp(
+            // 更新 mHistory 当前条目为擦除后的状态
+            if (idx >= 0 && idx < mHistory.size()) {
+                mHistory.set(idx, new ArrayList<>(mDoodles));
+            }
+            // EraseOp 描述从 idx-1 到 idx 的变换，存到 mUndoOps[idx-1]
+            int opIdx = idx - 1;
+            if (opIdx >= 0 && opIdx < mUndoOps.size()) {
+                mUndoOps.set(opIdx, new UndoOp(
                         new ArrayList<>(mEraseRemoved),
                         new ArrayList<>(mErasePositions),
                         mErasePreState,
                         new ArrayList<>(mDoodles)  // 擦除后完整状态
                 ));
-            }
-            // 更新 mHistory 当前条目为擦除后的状态
-            if (idx >= 0 && idx < mHistory.size()) {
-                mHistory.set(idx, new ArrayList<>(mDoodles));
             }
         }
         mEraseSessionActive = false;
