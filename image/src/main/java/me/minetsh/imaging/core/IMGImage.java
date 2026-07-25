@@ -411,37 +411,25 @@ public class IMGImage {
     }
 
     /**
-     * 序列化文字贴纸为 JSON 数组（存储为图片像素坐标，裁切后位置不变）
-     * 变换链：View 坐标 → Bitmap 坐标（与 saveBitmap 的 canvas 变换一致）
+     * 序列化文字贴纸为 JSON 数组
+     * 存储贴纸绝对View坐标 + 保存时 clipFrame 偏移量
+     * 加载时用公式校正：vx_load = vx_save - clipLeft_save + frameLeft_load
      */
     public JSONArray serializeStickers() {
         JSONArray arr = new JSONArray();
-        float scale = getScale();
-        if (scale <= 0) return arr;
-        float theta = (float) Math.toRadians(-getRotate());
-        float cos = (float) Math.cos(theta);
-        float sin = (float) Math.sin(theta);
-        float cx = mClipFrame.centerX();
-        float cy = mClipFrame.centerY();
-        float ox = mFrame.left;
-        float oy = mFrame.top;
 
         for (IMGSticker sticker : mBackStickers) {
             if (sticker instanceof IMGStickerTextView) {
                 IMGStickerTextView tv = (IMGStickerTextView) sticker;
                 try {
-                    // View 坐标（贴纸中心）→ Bitmap 像素坐标
-                    float vx = tv.getX() + tv.getPivotX();
-                    float vy = tv.getY() + tv.getPivotY();
-                    float bx = (vx - ox) / scale;
-                    float by = (vy - oy) / scale;
-                    float rx = bx * cos + by * sin + cx * (1 - cos) - cy * sin;
-                    float ry = -bx * sin + by * cos + cy * (1 - cos) + cx * sin;
-
                     JSONObject obj = new JSONObject();
                     obj.put("text", tv.getText().toJson());
-                    obj.put("x", Math.round(rx));
-                    obj.put("y", Math.round(ry));
+                    // 贴纸中心的绝对View坐标
+                    obj.put("vx", tv.getX() + tv.getPivotX());
+                    obj.put("vy", tv.getY() + tv.getPivotY());
+                    // 保存时 clipFrame 偏移（加载时用于校正裁切导致的位置变化）
+                    obj.put("cfL", mClipFrame.left);
+                    obj.put("cfT", mClipFrame.top);
                     obj.put("scale", tv.getScale());
                     obj.put("rotation", tv.getRotation());
                     arr.put(obj);
@@ -454,36 +442,28 @@ public class IMGImage {
     }
 
     /**
-     * 反序列化文字贴纸（在主线程调用，Bitmap 坐标 → View 坐标）
+     * 反序列化文字贴纸（在主线程调用）
+     * 公式：vx_load = vx_save - clipLeft_save + frameLeft_load
      * 位置设置延迟到布局完成后（此时 getPivotX/Y 才正确）
      */
     public void deserializeStickers(JSONArray arr, android.content.Context context,
                                      android.widget.FrameLayout parent) {
         if (arr == null || arr.length() == 0) return;
-        float scale = getScale();
-        if (scale <= 0) return;
-        float theta = (float) Math.toRadians(getRotate());
-        float cos = (float) Math.cos(theta);
-        float sin = (float) Math.sin(theta);
-        float cx = mClipFrame.centerX();
-        float cy = mClipFrame.centerY();
-        float ox = mFrame.left;
-        float oy = mFrame.top;
 
         for (int i = 0; i < arr.length(); i++) {
             try {
                 JSONObject obj = arr.getJSONObject(i);
                 IMGText text = IMGText.fromJson(obj.getJSONObject("text"));
-                float rx = (float) obj.getDouble("x");
-                float ry = (float) obj.getDouble("y");
+                float vxSave = (float) obj.getDouble("vx");
+                float vySave = (float) obj.getDouble("vy");
+                float clipLeftSave = (float) obj.optDouble("cfL", 0.0);
+                float clipTopSave = (float) obj.optDouble("cfT", 0.0);
                 float stickerScale = (float) obj.optDouble("scale", 1.0);
                 float rotation = (float) obj.optDouble("rotation", 0.0);
 
-                // Bitmap 坐标 → View 坐标（逆变换）
-                float bx = rx * cos + ry * sin + cx * (1 - cos) - cy * sin;
-                float by = -rx * sin + ry * cos + cy * (1 - cos) + cx * sin;
-                float vx = bx * scale + ox;
-                float vy = by * scale + oy;
+                // 校正位置：去掉保存时的裁切偏移，加上加载时的 frame 偏移
+                float vx = vxSave - clipLeftSave + mFrame.left;
+                float vy = vySave - clipTopSave + mFrame.top;
 
                 IMGStickerTextView tv = new IMGStickerTextView(context);
                 tv.setText(text);
