@@ -411,38 +411,19 @@ public class IMGImage {
     }
 
     /**
-     * 序列化文字贴纸为 JSON 数组
-     * 坐标使用和涂鸦完全一样的变换：M.setTranslate → M.postRotate → M.postTranslate → M.postScale
+     * 序列化文字贴纸为 JSON 数组（直接存储 View 坐标，不做任何变换）
      */
     public JSONArray serializeStickers() {
         JSONArray arr = new JSONArray();
-        float scale = getScale();
-        if (scale <= 0) return arr;
-        float invScale = 1f / scale;
-        float theta = (float) Math.toRadians(-getRotate());
-        float cos = (float) Math.cos(theta);
-        float sin = (float) Math.sin(theta);
-        float cx = mClipFrame.centerX();
-        float cy = mClipFrame.centerY();
-        float fl = mFrame.left;
-        float ft = mFrame.top;
 
         for (IMGSticker sticker : mBackStickers) {
             if (sticker instanceof IMGStickerTextView) {
                 IMGStickerTextView tv = (IMGStickerTextView) sticker;
                 try {
-                    float vx = tv.getX() + tv.getPivotX();
-                    float vy = tv.getY() + tv.getPivotY();
-                    float tx = vx - fl;
-                    float ty = vy - ft;
-                    // 和涂鸦 addPath 完全一样的变换
-                    float rx = (tx * cos + ty * sin + cx * (1 - cos) - cy * sin) * invScale;
-                    float ry = (-tx * sin + ty * cos + cy * (1 - cos) + cx * sin) * invScale;
-
                     JSONObject obj = new JSONObject();
                     obj.put("text", tv.getText().toJson());
-                    obj.put("x", Math.round(rx));
-                    obj.put("y", Math.round(ry));
+                    obj.put("x", tv.getX());
+                    obj.put("y", tv.getY());
                     obj.put("scale", tv.getScale());
                     obj.put("rotation", tv.getRotation());
                     arr.put(obj);
@@ -455,9 +436,7 @@ public class IMGImage {
     }
 
     /**
-     * 反序列化文字贴纸（在主线程调用）
-     * Bitmap 坐标存储在 tag 中，每次绘制时自动更新 View 位置
-     * 这样即使 frame 在 homing 动画中变化，贴纸位置也会自动修正
+     * 反序列化文字贴纸（在主线程调用，直接恢复 View 坐标）
      */
     public void deserializeStickers(JSONArray arr, android.content.Context context,
                                      android.widget.FrameLayout parent) {
@@ -467,17 +446,14 @@ public class IMGImage {
             try {
                 JSONObject obj = arr.getJSONObject(i);
                 IMGText text = IMGText.fromJson(obj.getJSONObject("text"));
-                float rx = (float) obj.getDouble("x");
-                float ry = (float) obj.getDouble("y");
+                float x = (float) obj.getDouble("x");
+                float y = (float) obj.getDouble("y");
                 float stickerScale = (float) obj.optDouble("scale", 1.0);
                 float rotation = (float) obj.optDouble("rotation", 0.0);
 
                 IMGStickerTextView tv = new IMGStickerTextView(context);
                 tv.setText(text);
                 tv.setRotation(rotation);
-
-                // 存储 Bitmap 坐标到 tag，供 updateStickerPositions() 使用
-                tv.setTag(new float[]{rx, ry, stickerScale});
 
                 android.widget.FrameLayout.LayoutParams lp =
                         new android.widget.FrameLayout.LayoutParams(
@@ -486,60 +462,20 @@ public class IMGImage {
                 parent.addView(tv, lp);
                 tv.registerCallback((IMGSticker.Callback) parent);
                 addSticker(tv);
+
+                // 延迟到布局完成后设置位置和缩放
+                final float vx = x;
+                final float vy = y;
+                final float sc = stickerScale;
+                tv.post(() -> {
+                    tv.setScale(sc);
+                    tv.setX(vx);
+                    tv.setY(vy);
+                });
             } catch (JSONException e) {
                 Log.e(TAG, "deserializeStickers failed", e);
             }
         }
-    }
-
-    // 记录上次更新贴纸位置时的 frame，用于检测 frame 变化
-    private android.graphics.RectF mLastStickerFrame = new android.graphics.RectF();
-
-    /**
-     * 更新所有带 tag 的贴纸位置（Bitmap 坐标 → View 坐标）
-     * 逆变换：先 scale，再 translate，再 rotate(+θ)
-     * 每次 onDraw 调用，frame 变化时自动更新，确保贴纸跟随图片移动
-     */
-    public boolean updateStickerPositions(android.widget.FrameLayout parent) {
-        if (mFrame.equals(mLastStickerFrame)) return false;
-        mLastStickerFrame.set(mFrame);
-
-        float scale = getScale();
-        if (scale <= 0) return false;
-        float theta = (float) Math.toRadians(getRotate());
-        float cos = (float) Math.cos(theta);
-        float sin = (float) Math.sin(theta);
-        float cx = mClipFrame.centerX();
-        float cy = mClipFrame.centerY();
-        float fl = mFrame.left;
-        float ft = mFrame.top;
-        boolean updated = false;
-
-        for (int i = 0; i < parent.getChildCount(); i++) {
-            android.view.View child = parent.getChildAt(i);
-            Object tag = child.getTag();
-            if (tag instanceof float[]) {
-                float[] data = (float[]) tag;
-                float rx = data[0], ry = data[1], sc = data[2];
-
-                // Bitmap → View（逆变换）
-                float sx = rx * scale;
-                float sy = ry * scale;
-                float vx = (sx - cx) * cos + (sy - cy) * sin + cx + fl;
-                float vy = -(sx - cx) * sin + (sy - cy) * cos + cy + ft;
-
-                if (child.getWidth() > 0 && child.getHeight() > 0) {
-                    child.setPivotX(child.getWidth() / 2f);
-                    child.setPivotY(child.getHeight() / 2f);
-                }
-                child.setScaleX(sc);
-                child.setScaleY(sc);
-                child.setX(vx - child.getPivotX());
-                child.setY(vy - child.getPivotY());
-                updated = true;
-            }
-        }
-        return updated;
     }
 
     /**

@@ -276,9 +276,6 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
     }
 
     private void onDrawImages(Canvas canvas) {
-        // frame 变化时自动更新贴纸位置（homing 动画期间每帧更新）
-        mImage.updateStickerPositions(this);
-
         if (mDrawLogCount < 3) {
             mDrawLogCount++;
             Log.d(TAG, "onDrawImages #" + mDrawLogCount
