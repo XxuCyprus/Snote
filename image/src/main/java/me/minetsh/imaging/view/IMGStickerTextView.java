@@ -25,9 +25,9 @@ public class IMGStickerTextView extends IMGStickerView implements IMGTextEditDia
 
     private static float mBaseTextSize = -1f;
 
-    private static final int PADDING = 26;
+    private static final int PADDING = 16;
 
-    private static final float TEXT_SIZE_SP = 24f;
+    private static final float TEXT_SIZE_SP = 14f;
 
     public IMGStickerTextView(Context context) {
         this(context, null, 0);

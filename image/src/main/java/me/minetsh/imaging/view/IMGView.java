@@ -300,7 +300,7 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         mImage.onDrawDoodles(canvas);
         if (mImage.getMode() == IMGMode.DOODLE && !mPen.isEmpty()) {
             mDoodlePaint.setColor(mPen.getColor());
-            mDoodlePaint.setStrokeWidth(mPenStrokeWidth * mImage.getScale());
+            mDoodlePaint.setStrokeWidth(mPenStrokeWidth);
             canvas.save();
             RectF frame = mImage.getClipFrame();
             canvas.rotate(-mImage.getRotate(), frame.centerX(), frame.centerY());
