@@ -455,6 +455,7 @@ public class IMGImage {
 
     /**
      * 反序列化文字贴纸（在主线程调用，Bitmap 坐标 → View 坐标）
+     * 位置设置延迟到布局完成后（此时 getPivotX/Y 才正确）
      */
     public void deserializeStickers(JSONArray arr, android.content.Context context,
                                      android.widget.FrameLayout parent) {
@@ -486,7 +487,6 @@ public class IMGImage {
 
                 IMGStickerTextView tv = new IMGStickerTextView(context);
                 tv.setText(text);
-                tv.setScale(stickerScale);
                 tv.setRotation(rotation);
 
                 android.widget.FrameLayout.LayoutParams lp =
@@ -497,9 +497,15 @@ public class IMGImage {
                 tv.registerCallback((IMGSticker.Callback) parent);
                 addSticker(tv);
 
-                // 设置位置（在 addSticker 之后，此时 pivot 已确定）
-                tv.setX(vx - tv.getPivotX());
-                tv.setY(vy - tv.getPivotY());
+                // 延迟到布局完成后设置位置和缩放（此时 getPivotX/Y 才正确）
+                final float targetVx = vx;
+                final float targetVy = vy;
+                final float targetScale = stickerScale;
+                tv.post(() -> {
+                    tv.setScale(targetScale);
+                    tv.setX(targetVx - tv.getPivotX());
+                    tv.setY(targetVy - tv.getPivotY());
+                });
             } catch (JSONException e) {
                 Log.e(TAG, "deserializeStickers failed", e);
             }

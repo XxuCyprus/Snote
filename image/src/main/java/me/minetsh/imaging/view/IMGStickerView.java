@@ -164,16 +164,24 @@ public abstract class IMGStickerView extends ViewGroup implements IMGSticker, Vi
         int maxWidth = 0;
         int childState = 0;
 
-        // 先用 AT_MOST 测量内容View，让文字按自然大小撑开
+        // 内容View用 AT_MOST 测量，且重置scale为1.0防止尺寸被放大
         if (mContentView != null && mContentView.getVisibility() != GONE) {
+            float savedScaleX = mContentView.getScaleX();
+            float savedScaleY = mContentView.getScaleY();
+            mContentView.setScaleX(1f);
+            mContentView.setScaleY(1f);
+
             int contentWidthSpec = MeasureSpec.makeMeasureSpec(
                     MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.AT_MOST);
             int contentHeightSpec = MeasureSpec.makeMeasureSpec(
                     MeasureSpec.getSize(heightMeasureSpec), MeasureSpec.AT_MOST);
             mContentView.measure(contentWidthSpec, contentHeightSpec);
-            maxWidth = Math.round(mContentView.getMeasuredWidth() * mContentView.getScaleX());
-            maxHeight = Math.round(mContentView.getMeasuredHeight() * mContentView.getScaleY());
+            maxWidth = mContentView.getMeasuredWidth();
+            maxHeight = mContentView.getMeasuredHeight();
             childState = mContentView.getMeasuredState();
+
+            mContentView.setScaleX(savedScaleX);
+            mContentView.setScaleY(savedScaleY);
         }
 
         // 锚点按钮用自身大小测量
@@ -188,7 +196,7 @@ public abstract class IMGStickerView extends ViewGroup implements IMGSticker, Vi
         maxHeight = Math.max(maxHeight, getSuggestedMinimumHeight());
         maxWidth = Math.max(maxWidth, getSuggestedMinimumWidth());
 
-        // 加上锚点按钮所需的空间（删除按钮在左上角，调整按钮在右下角）
+        // 加上锚点按钮所需的空间
         int anchorExtra = ANCHOR_SIZE;
         maxWidth += anchorExtra;
         maxHeight += anchorExtra;
