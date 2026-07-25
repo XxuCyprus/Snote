@@ -515,35 +515,6 @@ public class IMGImage {
     }
 
     /**
-     * 获取裁剪参数备份（Bitmap 空间坐标），用于保存到 JSON
-     */
-    public android.graphics.RectF getBackupClipFrame() {
-        return new android.graphics.RectF(mBackupClipFrame);
-    }
-
-    public float getBackupClipRotate() {
-        return mBackupClipRotate;
-    }
-
-    /**
-     * 从备份恢复裁剪区域（静默，不触发动画）
-     * mBackupClipFrame 是 Bitmap 空间坐标，需要转回 View 空间
-     */
-    public void restoreClip(android.graphics.RectF backupClipFrame, float backupRotate) {
-        // Bitmap 空间 → View 空间
-        float s = getScale();
-        mClipFrame.set(
-                backupClipFrame.left * s + mFrame.left,
-                backupClipFrame.top * s + mFrame.top,
-                backupClipFrame.right * s + mFrame.left,
-                backupClipFrame.bottom * s + mFrame.top
-        );
-        mBackupClipRotate = backupRotate;
-        setTargetRotate(backupRotate);
-        mClipWin.reset(mClipFrame, backupRotate);
-    }
-
-    /**
      * 临时移除所有贴纸（保存干净图片用）
      */
     public List<IMGSticker> clearStickersForSave() {

@@ -52,13 +52,6 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
 
     private IMGHoming mTargetHoming;
 
-    // 裁切记忆：加载时恢复裁切区域
-    private boolean mPendingClipRestore = false;
-    private android.graphics.RectF mSavedClipFrame;
-    private float mSavedClipRotate = 0;
-    private org.json.JSONArray mPendingStickerArr = null;
-    private android.content.Context mPendingStickerContext = null;
-
     private Pen mPen = new Pen();
 
     private int mPointerCount = 0;
@@ -243,34 +236,8 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         mImage.deserializeDoodles(json);
     }
 
-    /**
-     * 设置待恢复的裁切数据（加载时调用，裁切会在 homing 动画结束后自动应用）
-     */
-    public void setPendingClipRestore(android.graphics.RectF clipFrame, float clipRotate,
-                                       org.json.JSONArray stickerArr, android.content.Context context) {
-        mSavedClipFrame = clipFrame;
-        mSavedClipRotate = clipRotate;
-        mPendingStickerArr = stickerArr;
-        mPendingStickerContext = context;
-        mPendingClipRestore = true;
-    }
-
     public void prepareForSaveStickers() {
         mImage.stickAll();
-    }
-
-    public android.graphics.RectF getBackupClipFrame() {
-        return mImage.getBackupClipFrame();
-    }
-
-    public float getBackupClipRotate() {
-        return mImage.getBackupClipRotate();
-    }
-
-    public boolean hasClipData() {
-        android.graphics.RectF cf = mImage.getBackupClipFrame();
-        // 如果备份裁切区域不等于整个图片，说明有裁切
-        return cf.width() > 0 && cf.height() > 0;
     }
 
     public org.json.JSONArray serializeStickers() {
@@ -724,26 +691,8 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
             Log.d(TAG, "onAnimationEnd");
         }
         mTargetHoming = null;
-        boolean wasClip = mImage.onHomingEnd(getScrollX(), getScrollY(), mHomingAnimator.isRotate());
-        if (wasClip) {
+        if (mImage.onHomingEnd(getScrollX(), getScrollY(), mHomingAnimator.isRotate())) {
             toApplyHoming(mImage.clip(getScrollX(), getScrollY()));
-        }
-
-        // 裁切记忆：初始 homing 结束后恢复裁切区域
-        if (mPendingClipRestore) {
-            mPendingClipRestore = false;
-            mImage.restoreClip(mSavedClipFrame, mSavedClipRotate);
-            // 恢复裁切后触发新的 homing 动画
-            setMode(IMGMode.NONE);
-            onHoming();
-        }
-        // 裁切 homing 结束后设置贴纸位置
-        else if (mPendingStickerArr != null) {
-            org.json.JSONArray arr = mPendingStickerArr;
-            android.content.Context ctx = mPendingStickerContext;
-            mPendingStickerArr = null;
-            mPendingStickerContext = null;
-            mImage.deserializeStickers(arr, ctx, this);
         }
     }
 
