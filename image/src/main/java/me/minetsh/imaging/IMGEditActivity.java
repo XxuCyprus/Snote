@@ -326,9 +326,11 @@ public class IMGEditActivity extends IMGEditBaseActivity {
             org.json.JSONArray stickerArr = mImgView.serializeStickers();
             boolean hasStickers = stickerArr.length() > 0;
 
-            // 步骤1：保存纯底图（无涂鸦、无贴纸）到 _clean.jpg → 编辑器加载此图作为底图
-            Bitmap cleanBitmap = mImgView.saveCleanBitmap();
-            if (cleanBitmap == null) {
+            // 保存含涂鸦+贴纸的JPEG到 savePath → 内容页显示用
+            Bitmap displayBitmap = mImgView.saveBitmap();
+            Log.d(TAG, "SAVE: displayBitmap=" + (displayBitmap != null ? displayBitmap.getWidth() + "x" + displayBitmap.getHeight() : "null")
+                + ", savePath=" + savePath);
+            if (displayBitmap == null) {
                 runOnUiThread(() -> {
                     if (mCurrentDialog != null) mCurrentDialog.dismiss();
                     dismissLoadingDialog();
@@ -338,37 +340,16 @@ public class IMGEditActivity extends IMGEditBaseActivity {
                 return;
             }
 
-            String cleanPath = savePath + "_clean.jpg";
-            Log.d(TAG, "SAVE: cleanBitmap=" + cleanBitmap.getWidth() + "x" + cleanBitmap.getHeight()
-                + ", cleanPath=" + cleanPath);
-            FileOutputStream fout = null;
+            FileOutputStream dfout = null;
             try {
-                fout = new FileOutputStream(cleanPath);
-                cleanBitmap.compress(Bitmap.CompressFormat.JPEG, 95, fout);
+                dfout = new FileOutputStream(savePath);
+                displayBitmap.compress(Bitmap.CompressFormat.JPEG, 95, dfout);
             } catch (FileNotFoundException e) {
-                Log.e(TAG, "onDoneClick: compress clean failed", e);
+                Log.e(TAG, "onDoneClick: compress display failed", e);
             } finally {
-                if (fout != null) { try { fout.close(); } catch (IOException ignored) {} }
+                if (dfout != null) { try { dfout.close(); } catch (IOException ignored) {} }
             }
-            cleanBitmap.recycle();
-
-            // 步骤2：保存含涂鸦+贴纸的JPEG到 savePath → 内容页显示用
-            // 涂鸦+贴纸从JSON恢复，不再烘焙到 _clean.jpg
-            Bitmap displayBitmap = mImgView.saveBitmap();
-            Log.d(TAG, "SAVE: displayBitmap=" + (displayBitmap != null ? displayBitmap.getWidth() + "x" + displayBitmap.getHeight() : "null")
-                + ", savePath=" + savePath);
-            if (displayBitmap != null) {
-                FileOutputStream dfout = null;
-                try {
-                    dfout = new FileOutputStream(savePath);
-                    displayBitmap.compress(Bitmap.CompressFormat.JPEG, 95, dfout);
-                } catch (FileNotFoundException e) {
-                    Log.e(TAG, "onDoneClick: compress display failed", e);
-                } finally {
-                    if (dfout != null) { try { dfout.close(); } catch (IOException ignored) {} }
-                }
-                displayBitmap.recycle();
-            }
+            displayBitmap.recycle();
 
             // 序列化涂鸦 + 贴纸到 JSON
             String doodleJson = mImgView.serializeDoodles();

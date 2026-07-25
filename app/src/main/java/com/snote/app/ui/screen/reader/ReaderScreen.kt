@@ -391,13 +391,17 @@ fun ReaderScreen(
                             } else path
                             pendingEditOriginalPath = originalPath
 
-                            // 使用干净版图片（无贴纸）进行编辑，避免双重文字框
+                            // 使用原始未编辑图片作为编辑底图，确保涂鸦坐标始终对齐
                             val cleanPath = path + "_clean.jpg"
-                            val loadPath = if (File(cleanPath).exists()) {
-                                cleanPath  // 有干净版：加载它来编辑
-                            } else {
-                                path  // 首次编辑或无贴纸：加载原文件
+                            if (!File(cleanPath).exists()) {
+                                // 首次编辑：将原始图片复制为 _clean.jpg
+                                try {
+                                    File(originalPath).copyTo(File(cleanPath), overwrite = true)
+                                } catch (e: Exception) {
+                                    // 复制失败时使用原路径
+                                }
                             }
+                            val loadPath = cleanPath
 
                             val intent = Intent(context, IMGEditActivity::class.java)
                                 .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, Uri.fromFile(File(loadPath)))
