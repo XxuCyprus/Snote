@@ -15,12 +15,9 @@ import me.minetsh.imaging.core.file.IMGFileDecoder;
 import me.minetsh.imaging.core.util.IMGUtils;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 
 /**
  * Created by felix on 2017/11/14 下午2:26.
@@ -193,18 +190,17 @@ public class IMGEditActivity extends IMGEditBaseActivity {
                 }
                 bitmap.recycle();
 
-                // 将源图片复制为干净底图，放在保存路径旁边（用于二次编辑时撤销/重做）
-                // 必须放在保存路径（而非源路径）上，因为 updateImageContentPath 会删除旧路径文件
-                Uri sourceUri;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    sourceUri = getIntent().getParcelableExtra(EXTRA_IMAGE_URI, Uri.class);
-                } else {
-                    sourceUri = getIntent().getParcelableExtra(EXTRA_IMAGE_URI);
-                }
-                if (sourceUri != null) {
-                    String sourcePath = sourceUri.getPath();
-                    if (sourcePath != null) {
-                        copyFile(new File(sourcePath), new File(path + ".base"));
+                // 直接保存原始位图为干净底图（不经 Canvas 渲染，100% 有效）
+                Bitmap sourceBitmap = mImgView.getSourceBitmap();
+                if (sourceBitmap != null) {
+                    try {
+                        File baseFile = new File(path + ".base");
+                        FileOutputStream baseFout = new FileOutputStream(baseFile);
+                        sourceBitmap.compress(Bitmap.CompressFormat.JPEG, 95, baseFout);
+                        baseFout.flush();
+                        baseFout.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
                 }
 
@@ -246,19 +242,5 @@ public class IMGEditActivity extends IMGEditBaseActivity {
     @Override
     public void onColorChanged(int checkedColor) {
         mImgView.setPenColor(checkedColor);
-    }
-
-    private void copyFile(File src, File dst) {
-        try (InputStream in = new FileInputStream(src);
-             OutputStream out = new FileOutputStream(dst)) {
-            byte[] buf = new byte[8192];
-            int len;
-            while ((len = in.read(buf)) > 0) {
-                out.write(buf, 0, len);
-            }
-            out.flush();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 }
