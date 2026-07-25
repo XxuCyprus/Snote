@@ -107,14 +107,38 @@ public class IMGImage {
     private List<IMGPath> mDoodles = new ArrayList<>();
 
     /**
-     * 撤销栈（用于橡皮擦操作的整笔恢复）
+     * 线性历史：每个元素是一次操作前的完整 mDoodles 快照
      */
-    private List<List<IMGPath>> mUndoStack = new ArrayList<>();
+    private List<List<IMGPath>> mHistory = new ArrayList<>();
 
     /**
-     * 重做栈
+     * 当前状态在历史中的位置（mDoodles 对应 mHistory[mHistoryIndex]）
      */
-    private List<List<IMGPath>> mRedoStack = new ArrayList<>();
+    private int mHistoryIndex = 0;
+
+    private static final int MAX_HISTORY = 700;
+
+    /**
+     * 序列化用：记录撤销操作（增量格式，非快照）
+     * 与 mHistory 一一对应，但只存增量数据
+     * null = ADD 操作（路径就是 mHistory 对应快照的最后一个元素）
+     * 非 null = ERASE 操作（存储被擦除的路径 + 擦除前快照）
+     */
+    private static class UndoOp {
+        final List<IMGPath> removed;
+        final List<Integer> positions;
+        final List<IMGPath> preEraseSnapshot;
+
+        UndoOp(List<IMGPath> removed, List<Integer> positions, List<IMGPath> snapshot) {
+            this.removed = removed;
+            this.positions = positions;
+            this.preEraseSnapshot = snapshot;
+        }
+    }
+
+    private List<UndoOp> mUndoOps = new ArrayList<>();
+
+    private static final int MAX_SERIALIZED_HISTORY = 700;
 
     /**
      * 临时隐藏涂鸦（用于生成干净底图）
@@ -128,6 +152,13 @@ public class IMGImage {
     private Paint mPaint, mShadePaint;
 
     private Matrix M = new Matrix();
+
+    /**
+     * 涂鸦层位图缓存：避免每帧重绘所有路径
+     */
+    private Bitmap mDoodlesCache = null;
+    private Canvas mDoodlesCacheCanvas = null;
+    private boolean mDoodlesCacheDirty = true;
 
     private static final boolean DEBUG = false;
 
@@ -231,48 +262,85 @@ public class IMGImage {
         return mDoodles.isEmpty();
     }
 
+    private void invalidateDoodlesCache() {
+        mDoodlesCacheDirty = true;
+    }
+
     public void undoDoodle() {
-        // 优先从撤销栈恢复（橡皮擦操作）
-        if (!mUndoStack.isEmpty()) {
-            mRedoStack.add(new ArrayList<>(mDoodles));
-            mDoodles = mUndoStack.remove(mUndoStack.size() - 1);
-        } else if (!mDoodles.isEmpty()) {
-            // 保存当前状态到重做栈，然后移除最后一笔
-            mRedoStack.add(new ArrayList<>(mDoodles));
-            mDoodles.remove(mDoodles.size() - 1);
-        }
+        if (mHistoryIndex <= 0) return;
+        mHistoryIndex--;
+        mDoodles = new ArrayList<>(mHistory.get(mHistoryIndex));
+        invalidateDoodlesCache();
     }
 
     public void redoDoodle() {
-        if (!mRedoStack.isEmpty()) {
-            mUndoStack.add(new ArrayList<>(mDoodles));
-            mDoodles = mRedoStack.remove(mRedoStack.size() - 1);
-        }
+        if (mHistoryIndex >= mHistory.size() - 1) return;
+        mHistoryIndex++;
+        mDoodles = new ArrayList<>(mHistory.get(mHistoryIndex));
+        invalidateDoodlesCache();
     }
 
     public boolean canRedo() {
-        return !mRedoStack.isEmpty();
+        return mHistoryIndex < mHistory.size() - 1;
     }
 
     /**
-     * 将涂鸦状态序列化为 JSON（用于保存后重新编辑）
+     * 操作前保存当前状态快照到历史栈
+     */
+    private void pushHistory() {
+        // 截断 redo 历史（新操作使后续历史失效）
+        while (mHistory.size() > mHistoryIndex + 1) {
+            mHistory.remove(mHistory.size() - 1);
+        }
+        while (mUndoOps.size() > mHistoryIndex) {
+            mUndoOps.remove(mUndoOps.size() - 1);
+        }
+        // 保存当前状态
+        mHistory.add(new ArrayList<>(mDoodles));
+        mUndoOps.add(null); // 占位，后续可能被替换为 ERASE 操作
+        mHistoryIndex = mHistory.size() - 1;
+        // 限制历史大小
+        while (mHistory.size() > MAX_HISTORY) {
+            mHistory.remove(0);
+            mUndoOps.remove(0);
+            mHistoryIndex--;
+        }
+    }
+
+    /**
+     * 序列化为 JSON（紧凑增量格式）
+     * 只保存当前涂鸦 + 最近 N 条撤销操作（非完整快照）
      */
     public String serializeDoodles() {
         try {
             JSONObject root = new JSONObject();
             root.put("doodles", IMGPath.listToJson(mDoodles));
 
+            // 只序列化最近 MAX_SERIALIZED_HISTORY 条撤销操作
+            int start = Math.max(0, mUndoOps.size() - MAX_SERIALIZED_HISTORY);
             JSONArray undoArr = new JSONArray();
-            for (List<IMGPath> snapshot : mUndoStack) {
-                undoArr.put(IMGPath.listToJson(snapshot));
+            for (int i = start; i < mUndoOps.size(); i++) {
+                UndoOp op = mUndoOps.get(i);
+                JSONObject entry = new JSONObject();
+                if (op == null) {
+                    // ADD 操作：路径就是 mHistory[i+1] 的最后一个元素
+                    List<IMGPath> nextSnapshot = mHistory.get(i + 1);
+                    if (!nextSnapshot.isEmpty()) {
+                        entry.put("t", "a");
+                        entry.put("p", nextSnapshot.get(nextSnapshot.size() - 1).toJson());
+                    }
+                } else {
+                    // ERASE 操作
+                    entry.put("t", "e");
+                    entry.put("r", IMGPath.listToJson(op.removed));
+                    JSONArray posArr = new JSONArray();
+                    for (int p : op.positions) posArr.put(p);
+                    entry.put("pos", posArr);
+                    entry.put("snap", IMGPath.listToJson(op.preEraseSnapshot));
+                }
+                undoArr.put(entry);
             }
-            root.put("undoStack", undoArr);
-
-            JSONArray redoArr = new JSONArray();
-            for (List<IMGPath> snapshot : mRedoStack) {
-                redoArr.put(IMGPath.listToJson(snapshot));
-            }
-            root.put("redoStack", redoArr);
+            root.put("undo", undoArr);
 
             return root.toString();
         } catch (JSONException e) {
@@ -282,8 +350,7 @@ public class IMGImage {
     }
 
     /**
-     * 从 JSON 反序列化涂鸦状态
-     * 不加载旧的 undo/redo stack（可能格式不兼容），而是重建一个干净的 undo stack
+     * 从 JSON 反序列化涂鸦状态（兼容旧格式）
      */
     public void deserializeDoodles(String json) {
         if (json == null) return;
@@ -292,26 +359,86 @@ public class IMGImage {
 
             mDoodles = IMGPath.listFromJson(root.getJSONArray("doodles"));
 
-            // 重建 undo stack：从空状态到当前状态，每步多一个 doodle
-            // 栈底 = 空列表，栈顶 = 只差最后一个 doodle 的状态
-            // 这样每次 pop 移除恰好一个 doodle
-            mUndoStack.clear();
-            for (int i = 0; i < mDoodles.size(); i++) {
-                mUndoStack.add(new ArrayList<>(mDoodles.subList(0, i)));
-            }
+            mHistory.clear();
+            mUndoOps.clear();
 
-            mRedoStack.clear();
+            if (root.has("undo")) {
+                // 新紧凑格式：从 undo 操作重建历史
+                JSONArray undoArr = root.getJSONArray("undo");
+                // 初始状态：空列表
+                mHistory.add(new ArrayList<IMGPath>());
+                for (int i = 0; i < undoArr.length(); i++) {
+                    JSONObject entry = undoArr.getJSONObject(i);
+                    String type = entry.optString("t", "");
+                    if (type.equals("a")) {
+                        // ADD：从上一个快照 + 新路径 构建下一个快照
+                        IMGPath added = IMGPath.fromJson(entry.getJSONObject("p"));
+                        List<IMGPath> prev = mHistory.get(mHistory.size() - 1);
+                        List<IMGPath> next = new ArrayList<>(prev);
+                        next.add(added);
+                        mHistory.add(next);
+                        mUndoOps.add(null);
+                    } else if (type.equals("e")) {
+                        // ERASE：从快照还原
+                        List<IMGPath> snapshot = IMGPath.listFromJson(entry.getJSONArray("snap"));
+                        mHistory.add(snapshot);
+                        List<IMGPath> removed = IMGPath.listFromJson(entry.getJSONArray("r"));
+                        JSONArray posArr = entry.getJSONArray("pos");
+                        List<Integer> positions = new ArrayList<>();
+                        for (int j = 0; j < posArr.length(); j++) positions.add(posArr.getInt(j));
+                        mUndoOps.add(new UndoOp(removed, positions, snapshot));
+                    }
+                }
+                // 最终状态应该等于当前 mDoodles
+                mHistoryIndex = mHistory.size() - 1;
+            } else if (root.has("history")) {
+                // 兼容上一版完整快照格式
+                JSONArray histArr = root.getJSONArray("history");
+                for (int i = 0; i < histArr.length(); i++) {
+                    mHistory.add(IMGPath.listFromJson(histArr.getJSONArray(i)));
+                }
+                mHistoryIndex = root.optInt("historyIndex", mHistory.size() - 1);
+                // 重建 mUndoOps（全部标记为 ADD）
+                for (int i = 0; i < mHistory.size() - 1; i++) mUndoOps.add(null);
+            } else {
+                // 无历史：用当前状态初始化
+                mHistory.add(new ArrayList<>(mDoodles));
+                mHistoryIndex = 0;
+            }
         } catch (JSONException e) {
             Log.e(TAG, "deserializeDoodles failed", e);
         }
+        invalidateDoodlesCache();
     }
 
-    /**
-     * 橡皮擦开始触摸时，保存当前涂鸦状态到撤销栈
-     */
+    private boolean mEraseSessionActive = false;
+    private List<IMGPath> mEraseRemoved = new ArrayList<>();
+    private List<Integer> mErasePositions = new ArrayList<>();
+
     public void eraseBegin() {
-        mUndoStack.add(new ArrayList<>(mDoodles));
-        mRedoStack.clear();
+        if (mEraseSessionActive) return;
+        mEraseSessionActive = true;
+        mEraseRemoved.clear();
+        mErasePositions.clear();
+        // 擦除开始前保存快照
+        pushHistory();
+    }
+
+    public void eraseEnd() {
+        if (mEraseSessionActive && !mEraseRemoved.isEmpty()) {
+            // 将最后一个 undoOp（null占位）替换为 ERASE 操作
+            int idx = mHistoryIndex - 1;
+            if (idx >= 0 && idx < mUndoOps.size()) {
+                mUndoOps.set(idx, new UndoOp(
+                        new ArrayList<>(mEraseRemoved),
+                        new ArrayList<>(mErasePositions),
+                        mHistory.get(idx)
+                ));
+            }
+        }
+        mEraseSessionActive = false;
+        // 擦除结束，标记缓存失效，下一帧重建
+        invalidateDoodlesCache();
     }
 
     /**
@@ -320,6 +447,7 @@ public class IMGImage {
     public void clearDoodlesTemporarily() {
         mDoodlesBackup = new ArrayList<>(mDoodles);
         mDoodles = new ArrayList<>();
+        invalidateDoodlesCache();
     }
 
     /**
@@ -329,6 +457,7 @@ public class IMGImage {
         if (mDoodlesBackup != null) {
             mDoodles = mDoodlesBackup;
             mDoodlesBackup = null;
+            invalidateDoodlesCache();
         }
     }
 
@@ -357,10 +486,23 @@ public class IMGImage {
         float imgR = radius * invScale;
 
         List<IMGPath> newDoodles = new ArrayList<>();
-        for (IMGPath path : mDoodles) {
-            newDoodles.addAll(path.eraseNear(imgX, imgY, imgR));
+        for (int idx = 0; idx < mDoodles.size(); idx++) {
+            IMGPath path = mDoodles.get(idx);
+            List<IMGPath> parts = path.eraseNear(imgX, imgY, imgR);
+            if (parts.size() == 1 && parts.get(0) == path) {
+                newDoodles.add(path);
+            } else {
+                // 记录被擦除的原始路径和位置
+                mEraseRemoved.add(path);
+                mErasePositions.add(idx);
+                newDoodles.addAll(parts);
+            }
         }
         mDoodles = newDoodles;
+        // 擦除期间不标记缓存失效，等 eraseEnd() 时统一重建
+        if (!mEraseSessionActive) {
+            invalidateDoodlesCache();
+        }
     }
 
     public RectF getClipFrame() {
@@ -493,8 +635,9 @@ public class IMGImage {
 
         switch (path.getMode()) {
             case DOODLE:
+                pushHistory();
                 mDoodles.add(path);
-                mRedoStack.clear();
+                invalidateDoodlesCache();
                 break;
         }
     }
@@ -555,7 +698,10 @@ public class IMGImage {
 
         mWindow.set(0, 0, width, height);
 
-        if (!isInitialHoming) {
+        // 即使 isInitialHoming 已被设置为 false（例如通过 onImageChanged），
+        // 只要 mFrame 还是空的（未初始化），就必须执行初始化。
+        // 这防止 setMode() 在 onLayout() 之前触发的动画使用空 frame。
+        if (!isInitialHoming || mFrame.isEmpty()) {
             onInitialHoming(width, height);
         } else {
 
@@ -625,16 +771,54 @@ public class IMGImage {
     }
 
     public void onDrawDoodles(Canvas canvas) {
-        if (!isDoodleEmpty()) {
-            canvas.save();
-            float scale = getScale();
-            canvas.translate(mFrame.left, mFrame.top);
-            canvas.scale(scale, scale);
+        if (isDoodleEmpty()) return;
+
+        canvas.save();
+        float scale = getScale();
+        canvas.translate(mFrame.left, mFrame.top);
+        canvas.scale(scale, scale);
+
+        // 擦除期间：直接绘制所有路径到屏幕，跳过缓存重建
+        if (mEraseSessionActive) {
             for (IMGPath path : mDoodles) {
                 path.onDrawDoodle(canvas, mPaint);
             }
             canvas.restore();
+            return;
         }
+
+        int imgW = mImage.getWidth();
+        int imgH = mImage.getHeight();
+
+        if (imgW <= 0 || imgH <= 0) {
+            canvas.restore();
+            return;
+        }
+
+        // 按需重建缓存
+        if (mDoodlesCacheDirty || mDoodlesCache == null
+                || mDoodlesCache.getWidth() != imgW || mDoodlesCache.getHeight() != imgH) {
+            if (mDoodlesCache != null) {
+                mDoodlesCache.recycle();
+            }
+            mDoodlesCache = Bitmap.createBitmap(imgW, imgH, Bitmap.Config.ARGB_8888);
+            mDoodlesCacheCanvas = new Canvas(mDoodlesCache);
+            mDoodlesCacheDirty = false;
+        } else {
+            // 缓存有效，直接绘制
+            canvas.drawBitmap(mDoodlesCache, 0, 0, null);
+            canvas.restore();
+            return;
+        }
+
+        // 重新渲染缓存
+        mDoodlesCache.eraseColor(Color.TRANSPARENT);
+        for (IMGPath path : mDoodles) {
+            path.onDrawDoodle(mDoodlesCacheCanvas, mPaint);
+        }
+
+        canvas.drawBitmap(mDoodlesCache, 0, 0, null);
+        canvas.restore();
     }
 
     public void onDrawStickerClip(Canvas canvas) {
@@ -837,6 +1021,11 @@ public class IMGImage {
     }
 
     public void release() {
+        if (mDoodlesCache != null) {
+            mDoodlesCache.recycle();
+            mDoodlesCache = null;
+            mDoodlesCacheCanvas = null;
+        }
         if (mImage != null && !mImage.isRecycled()) {
             mImage.recycle();
         }

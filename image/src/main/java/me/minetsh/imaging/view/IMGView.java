@@ -144,6 +144,11 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         }
     }
 
+    public void prepareForSave() {
+        removeCallbacks(this);
+        stopHoming();
+    }
+
     public void doRotate() {
         if (!isHoming()) {
             mImage.rotate(-90);
@@ -234,12 +239,25 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         return mImage.getMode();
     }
 
+    private int mDrawLogCount = 0;
+
     @Override
     protected void onDraw(Canvas canvas) {
         onDrawImages(canvas);
     }
 
     private void onDrawImages(Canvas canvas) {
+        if (mDrawLogCount < 3) {
+            mDrawLogCount++;
+            Log.d(TAG, "onDrawImages #" + mDrawLogCount
+                + ": canvas=" + canvas.getWidth() + "x" + canvas.getHeight()
+                + ", scrollX=" + getScrollX() + ", scrollY=" + getScrollY()
+                + ", clipFrame=" + mImage.getClipFrame()
+                + ", frame=" + mImage.getFrame()
+                + ", rotate=" + mImage.getRotate()
+                + ", scale=" + mImage.getScale()
+                + ", mode=" + mImage.getMode());
+        }
         canvas.save();
 
         // clip 中心旋转
@@ -510,6 +528,7 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
                 return true;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
+                mImage.eraseEnd();
                 return true;
         }
         return false;
@@ -568,16 +587,29 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         mImage.onScaleEnd();
     }
 
+    private int mAnimLogCount = 0;
+
     @Override
     public void onAnimationUpdate(ValueAnimator animation) {
         mImage.onHoming(animation.getAnimatedFraction());
         toApplyHoming((IMGHoming) animation.getAnimatedValue());
+        if (mAnimLogCount < 5) {
+            mAnimLogCount++;
+            Log.d(TAG, "animUpdate #" + mAnimLogCount
+                + ": fraction=" + animation.getAnimatedFraction()
+                + ", scrollX=" + getScrollX() + ", scrollY=" + getScrollY()
+                + ", frame=" + mImage.getClipFrame()
+                + ", scale=" + mImage.getScale());
+        }
     }
 
 
     private void toApplyHoming(IMGHoming homing) {
         mImage.setScale(homing.scale);
         mImage.setRotate(homing.rotate);
+        if (mAnimLogCount <= 5) {
+            Log.d(TAG, "toApplyHoming: scale=" + homing.scale + ", rotate=" + homing.rotate + ", x=" + homing.x + ", y=" + homing.y);
+        }
         if (!onScrollTo(Math.round(homing.x), Math.round(homing.y))) {
             invalidate();
         }

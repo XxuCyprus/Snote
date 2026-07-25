@@ -121,11 +121,15 @@ fun ReaderScreen(
                 val relativePath = savedPath.removePrefix("$dataDirPath/")
                 viewModel.updateImageContent(itemId, relativePath)
                 // 保存涂鸦数据 + 原图路径，用于下次重新编辑时恢复
-                val doodleJson = result.data?.getStringExtra(IMGEditActivity.EXTRA_DOODLE_JSON)
-                if (doodleJson != null) {
-                    val json = try { org.json.JSONObject(doodleJson) } catch (e: Exception) { org.json.JSONObject() }
-                    json.put("originalPath", pendingEditOriginalPath ?: "")
-                    java.io.File(savedPath + ".doodles.json").writeText(json.toString())
+                val doodleFilePath = result.data?.getStringExtra(IMGEditActivity.EXTRA_DOODLE_FILE_PATH)
+                if (doodleFilePath != null) {
+                    val doodleFile = java.io.File(doodleFilePath)
+                    if (doodleFile.exists()) {
+                        val doodleJson = doodleFile.readText()
+                        val json = try { org.json.JSONObject(doodleJson) } catch (e: Exception) { org.json.JSONObject() }
+                        json.put("originalPath", pendingEditOriginalPath ?: "")
+                        java.io.File(savedPath + ".doodles.json").writeText(json.toString())
+                    }
                 }
             }
         }
@@ -381,17 +385,23 @@ fun ReaderScreen(
                                 try {
                                     val json = org.json.JSONObject(existingJsonFile.readText())
                                     val op = json.optString("originalPath", "")
+                                    android.util.Log.d("IMGEdit", "onImageEdit: JSON originalPath=$op")
                                     if (op.isNotEmpty()) op else path
-                                } catch (e: Exception) { path }
+                                } catch (e: Exception) {
+                                    android.util.Log.e("IMGEdit", "onImageEdit: JSON parse error", e)
+                                    path
+                                }
                             } else path
+                            android.util.Log.d("IMGEdit", "onImageEdit: final originalPath=$originalPath")
+                            android.util.Log.d("IMGEdit", "onImageEdit: originalFile exists=${java.io.File(originalPath).exists()}")
                             pendingEditOriginalPath = originalPath
 
                             val intent = Intent(context, IMGEditActivity::class.java)
                                 .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, Uri.fromFile(File(originalPath)))
                                 .putExtra(IMGEditActivity.EXTRA_IMAGE_SAVE_PATH, saveFile.absolutePath)
-                            // 加载已有涂鸦数据
+                            // 加载已有涂鸦数据（通过文件路径避免 TransactionTooLargeException）
                             if (existingJsonFile.exists()) {
-                                intent.putExtra(IMGEditActivity.EXTRA_DOODLE_JSON, existingJsonFile.readText())
+                                intent.putExtra(IMGEditActivity.EXTRA_DOODLE_FILE_PATH, existingJsonFile.absolutePath)
                             }
                             imageEditLauncher.launch(intent)
                         },

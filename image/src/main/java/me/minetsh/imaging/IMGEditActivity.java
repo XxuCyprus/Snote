@@ -6,6 +6,8 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.text.TextUtils;
+import android.util.Log;
+import android.graphics.Color;
 
 import me.minetsh.imaging.core.IMGMode;
 import me.minetsh.imaging.core.IMGText;
@@ -34,24 +36,122 @@ public class IMGEditActivity extends IMGEditBaseActivity {
 
     public static final String EXTRA_DOODLE_JSON = "DOODLE_JSON";
 
+    public static final String EXTRA_DOODLE_FILE_PATH = "DOODLE_FILE_PATH";
+
+    private static final String TAG = "IMGEdit";
+
     @Override
     public void onCreated() {
-        // 从 Intent extra 加载已有的涂鸦数据
-        String doodleJson = getIntent().getStringExtra(EXTRA_DOODLE_JSON);
-        if (doodleJson != null && !doodleJson.isEmpty()) {
-            mImgView.deserializeDoodles(doodleJson);
-            // 有已有涂鸦时自动进入涂鸦模式，否则撤销按钮不响应
-            if (!mImgView.isDoodleEmpty()) {
-                mImgView.setMode(IMGMode.DOODLE);
-                updateModeUI();
-            }
+        String doodleFilePath = getIntent().getStringExtra(EXTRA_DOODLE_FILE_PATH);
+        String doodleJsonFromIntent = getIntent().getStringExtra(EXTRA_DOODLE_JSON);
+
+        if (doodleFilePath != null || doodleJsonFromIntent != null) {
+            // Material 风格加载对话框
+            android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+            layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+            int pad = (int) (32 * getResources().getDisplayMetrics().density);
+            layout.setPadding(pad, pad, pad, pad);
+
+            android.widget.ProgressBar progress = new android.widget.ProgressBar(this);
+            android.widget.LinearLayout.LayoutParams progressParams = new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+            progressParams.gravity = android.view.Gravity.CENTER;
+            progress.setLayoutParams(progressParams);
+
+            android.widget.TextView text = new android.widget.TextView(this);
+            text.setText("正在恢复编辑记录...");
+            text.setGravity(android.view.Gravity.CENTER);
+            text.setTextColor(0xFF333333);
+            text.setTextSize(16);
+            text.setPadding(0, pad / 2, 0, 0);
+
+            layout.addView(progress);
+            layout.addView(text);
+
+            android.app.AlertDialog loadDialog = new android.app.AlertDialog.Builder(this)
+                    .setView(layout)
+                    .setCancelable(false)
+                    .create();
+            loadDialog.show();
+
+            final String filePath = doodleFilePath;
+            final String jsonFallback = doodleJsonFromIntent;
+            final android.widget.TextView tv = text;
+            final long showTime = System.currentTimeMillis();
+
+            new Thread(() -> {
+                String doodleJson = null;
+                int undoCount = 0;
+
+                if (filePath != null) {
+                    java.io.File doodleFile = new java.io.File(filePath);
+                    if (doodleFile.exists()) {
+                        try {
+                            byte[] bytes = new byte[(int) doodleFile.length()];
+                            java.io.FileInputStream fis = new java.io.FileInputStream(doodleFile);
+                            fis.read(bytes);
+                            fis.close();
+                            doodleJson = new String(bytes, "UTF-8");
+                        } catch (IOException e) {
+                            Log.e(TAG, "onCreated: failed to read doodle file", e);
+                        }
+                    }
+                }
+                if (doodleJson == null) {
+                    doodleJson = jsonFallback;
+                }
+
+                if (doodleJson != null && !doodleJson.isEmpty()) {
+                    try {
+                        org.json.JSONObject root = new org.json.JSONObject(doodleJson);
+                        if (root.has("undo")) {
+                            undoCount = root.getJSONArray("undo").length();
+                        } else if (root.has("history")) {
+                            undoCount = root.getJSONArray("history").length();
+                        }
+                    } catch (Exception ignored) {}
+                }
+
+                final String json = doodleJson;
+                final int count = undoCount;
+
+                // 在后台线程执行反序列化（重建 700 步历史很重）
+                if (json != null && !json.isEmpty()) {
+                    mImgView.deserializeDoodles(json);
+                }
+
+                runOnUiThread(() -> {
+                    if (json != null && !json.isEmpty()) {
+                        if (!mImgView.isDoodleEmpty()) {
+                            mImgView.post(() -> {
+                                mImgView.setMode(IMGMode.DOODLE);
+                                updateModeUI();
+                            });
+                        }
+                    }
+                    tv.setText("已恢复 " + count + " 条编辑记录");
+
+                    long elapsed = System.currentTimeMillis() - showTime;
+                    long remaining = 2000 - elapsed;
+                    if (remaining > 0) {
+                        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                            loadDialog.dismiss();
+                        }, remaining);
+                    } else {
+                        loadDialog.dismiss();
+                    }
+                });
+            }).start();
         }
     }
 
     @Override
     public Bitmap getBitmap() {
+        Log.d(TAG, "=== getBitmap() START ===");
         Intent intent = getIntent();
         if (intent == null) {
+            Log.e(TAG, "getBitmap: intent is null");
             return null;
         }
 
@@ -61,13 +161,19 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         } else {
             uri = intent.getParcelableExtra(EXTRA_IMAGE_URI);
         }
+        Log.d(TAG, "getBitmap: uri=" + uri);
         if (uri == null) {
+            Log.e(TAG, "getBitmap: URI is null");
             return null;
         }
 
+        String path = uri.getPath();
+        java.io.File imgFile = new java.io.File(path);
+        Log.d(TAG, "getBitmap: path=" + path);
+        Log.d(TAG, "getBitmap: file exists=" + imgFile.exists() + ", size=" + (imgFile.exists() ? imgFile.length() : 0));
+
         IMGDecoder decoder = null;
 
-        String path = uri.getPath();
         if (!TextUtils.isEmpty(path)) {
             switch (uri.getScheme()) {
                 case "asset":
@@ -80,6 +186,7 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         }
 
         if (decoder == null) {
+            Log.e(TAG, "getBitmap: decoder is null");
             return null;
         }
 
@@ -88,6 +195,7 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         options.inJustDecodeBounds = true;
 
         decoder.decode(options);
+        Log.d(TAG, "getBitmap: decode bounds outWidth=" + options.outWidth + " outHeight=" + options.outHeight);
 
         if (options.outWidth > MAX_WIDTH) {
             options.inSampleSize = IMGUtils.inSampleSize(Math.round(1f * options.outWidth / MAX_WIDTH));
@@ -101,10 +209,12 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         options.inJustDecodeBounds = false;
 
         Bitmap bitmap = decoder.decode(options);
-        if (bitmap == null) {
-            return null;
+        Log.d(TAG, "getBitmap: bitmap=" + (bitmap == null ? "null" : bitmap.getWidth() + "x" + bitmap.getHeight() + " config=" + bitmap.getConfig()));
+        if (bitmap != null) {
+            int pixel = bitmap.getPixel(bitmap.getWidth() / 2, bitmap.getHeight() / 2);
+            Log.d(TAG, "getBitmap: center pixel color=#" + Integer.toHexString(pixel) + " (isBlack=" + (pixel == Color.BLACK) + ")");
         }
-
+        Log.d(TAG, "=== getBitmap() END ===");
         return bitmap;
     }
 
@@ -148,40 +258,118 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         finish();
     }
 
+    private boolean mIsSaving = false;
+
     @Override
     public void onDoneClick() {
-        String path = getIntent().getStringExtra(EXTRA_IMAGE_SAVE_PATH);
-        if (!TextUtils.isEmpty(path)) {
-            Bitmap bitmap = mImgView.saveBitmap();
-            if (bitmap != null) {
-                FileOutputStream fout = null;
-                try {
-                    fout = new FileOutputStream(path);
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 95, fout);
-                } catch (FileNotFoundException e) {
-                    e.printStackTrace();
-                } finally {
-                    if (fout != null) {
-                        try {
-                            fout.close();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }
-                bitmap.recycle();
+        if (mIsSaving) return;
+        mIsSaving = true;
 
-                // 将涂鸦数据放入返回 Intent
-                String doodleJson = mImgView.serializeDoodles();
-                Intent resultIntent = new Intent();
-                resultIntent.putExtra(EXTRA_DOODLE_JSON, doodleJson);
-                setResult(RESULT_OK, resultIntent);
-                finish();
+        String path = getIntent().getStringExtra(EXTRA_IMAGE_SAVE_PATH);
+        if (TextUtils.isEmpty(path)) {
+            setResult(RESULT_CANCELED);
+            finish();
+            return;
+        }
+
+        // 停止所有动画和回调，防止后台读取冲突
+        mImgView.prepareForSave();
+
+        // 构建 Material 风格对话框
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = (int) (32 * getResources().getDisplayMetrics().density);
+        layout.setPadding(pad, pad, pad, pad);
+
+        android.widget.ProgressBar progress = new android.widget.ProgressBar(this);
+        progress.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+        ((android.widget.LinearLayout.LayoutParams) progress.getLayoutParams()).gravity = android.view.Gravity.CENTER;
+
+        android.widget.TextView text = new android.widget.TextView(this);
+        text.setText("正在保存...");
+        text.setGravity(android.view.Gravity.CENTER);
+        text.setTextColor(0xFF333333);
+        text.setTextSize(16);
+        text.setPadding(0, pad / 2, 0, 0);
+
+        layout.addView(progress);
+        layout.addView(text);
+
+        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(this)
+                .setView(layout)
+                .setCancelable(false)
+                .create();
+        dialog.show();
+        final long showTime = System.currentTimeMillis();
+
+        // 全部重活移到后台线程：saveBitmap + serializeDoodles + JPEG压缩 + 文件写入
+        final String savePath = path;
+        final String jsonPath = path + ".doodles.json";
+        new Thread(() -> {
+            // 渲染位图
+            Bitmap bitmap = mImgView.saveBitmap();
+            if (bitmap == null) {
+                runOnUiThread(() -> {
+                    dialog.dismiss();
+                    setResult(RESULT_CANCELED);
+                    finish();
+                });
                 return;
             }
-        }
-        setResult(RESULT_CANCELED);
-        finish();
+
+            // 序列化涂鸦 JSON
+            String doodleJson = mImgView.serializeDoodles();
+
+            // JPEG 压缩
+            FileOutputStream fout = null;
+            try {
+                fout = new FileOutputStream(savePath);
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 95, fout);
+            } catch (FileNotFoundException e) {
+                Log.e(TAG, "onDoneClick: compress failed", e);
+            } finally {
+                if (fout != null) {
+                    try { fout.close(); } catch (IOException ignored) {}
+                }
+            }
+            bitmap.recycle();
+
+            // 写入涂鸦 JSON
+            java.io.FileWriter fw = null;
+            try {
+                fw = new java.io.FileWriter(jsonPath);
+                fw.write(doodleJson);
+            } catch (IOException e) {
+                Log.e(TAG, "onDoneClick: failed to write doodle file", e);
+            } finally {
+                if (fw != null) {
+                    try { fw.close(); } catch (IOException ignored) {}
+                }
+            }
+
+            // 最低显示 3 秒
+            long elapsed = System.currentTimeMillis() - showTime;
+            long remaining = 3000 - elapsed;
+            if (remaining > 0) {
+                try { Thread.sleep(remaining); } catch (InterruptedException ignored) {}
+            }
+
+            runOnUiThread(() -> {
+                dialog.dismiss();
+                Intent resultIntent = new Intent();
+                resultIntent.putExtra(EXTRA_DOODLE_FILE_PATH, jsonPath);
+                setResult(RESULT_OK, resultIntent);
+                finish();
+            });
+        }).start();
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (mIsSaving) return;
+        super.onBackPressed();
     }
 
     @Override

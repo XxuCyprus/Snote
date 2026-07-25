@@ -203,41 +203,49 @@ public class IMGPath {
     }
 
     /**
-     * 序列化为 JSON
+     * 序列化为 JSON（精简格式：短key、扁平数组、坐标取整）
      */
     public JSONObject toJson() throws JSONException {
         JSONObject obj = new JSONObject();
-        obj.put("color", color);
-        obj.put("width", (double) width);
+        obj.put("c", color);
+        obj.put("w", Math.round(width));
 
-        // 用 PathMeasure 提取路径点
         float[] pts = approximatePathPoints();
         JSONArray arr = new JSONArray();
-        for (int i = 0; i < pts.length; i += 2) {
-            JSONArray pt = new JSONArray();
-            pt.put((double) pts[i]);
-            pt.put((double) pts[i + 1]);
-            arr.put(pt);
+        for (int i = 0; i < pts.length; i++) {
+            arr.put(Math.round(pts[i]));
         }
-        obj.put("points", arr);
+        obj.put("p", arr);
         return obj;
     }
 
     /**
-     * 从 JSON 反序列化
+     * 从 JSON 反序列化（兼容精简格式和旧格式）
      */
     public static IMGPath fromJson(JSONObject obj) throws JSONException {
-        int color = obj.getInt("color");
-        float width = (float) obj.getDouble("width");
+        int color = obj.optInt("c", obj.optInt("color", Color.RED));
+        float width = (float) obj.optDouble("w", obj.optDouble("width", BASE_DOODLE_WIDTH));
 
-        JSONArray arr = obj.getJSONArray("points");
         Path path = new Path();
-        if (arr.length() > 0) {
-            JSONArray first = arr.getJSONArray(0);
-            path.moveTo((float) first.getDouble(0), (float) first.getDouble(1));
-            for (int i = 1; i < arr.length(); i++) {
-                JSONArray pt = arr.getJSONArray(i);
-                path.lineTo((float) pt.getDouble(0), (float) pt.getDouble(1));
+        if (obj.has("p")) {
+            // 精简格式：扁平数组 [x1,y1,x2,y2,...]
+            JSONArray arr = obj.getJSONArray("p");
+            if (arr.length() >= 2) {
+                path.moveTo((float) arr.getDouble(0), (float) arr.getDouble(1));
+                for (int i = 2; i < arr.length(); i += 2) {
+                    path.lineTo((float) arr.getDouble(i), (float) arr.getDouble(i + 1));
+                }
+            }
+        } else if (obj.has("points")) {
+            // 旧格式：嵌套数组 [[x1,y1],[x2,y2],...]
+            JSONArray arr = obj.getJSONArray("points");
+            if (arr.length() > 0) {
+                JSONArray first = arr.getJSONArray(0);
+                path.moveTo((float) first.getDouble(0), (float) first.getDouble(1));
+                for (int i = 1; i < arr.length(); i++) {
+                    JSONArray pt = arr.getJSONArray(i);
+                    path.lineTo((float) pt.getDouble(0), (float) pt.getDouble(1));
+                }
             }
         }
         return new IMGPath(path, IMGMode.DOODLE, color, width);
