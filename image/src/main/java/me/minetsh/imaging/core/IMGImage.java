@@ -444,7 +444,7 @@ public class IMGImage {
     /**
      * 反序列化文字贴纸（在主线程调用）
      * 公式：vx_load = vx_save - clipLeft_save + frameLeft_load
-     * 位置设置延迟到布局完成后（此时 getPivotX/Y 才正确）
+     * 使用 ViewTreeObserver 确保在布局完成且 homing 动画结束后才设置位置
      */
     public void deserializeStickers(JSONArray arr, android.content.Context context,
                                      android.widget.FrameLayout parent) {
@@ -461,10 +461,6 @@ public class IMGImage {
                 float stickerScale = (float) obj.optDouble("scale", 1.0);
                 float rotation = (float) obj.optDouble("rotation", 0.0);
 
-                // 校正位置：去掉保存时的裁切偏移，加上加载时的 frame 偏移
-                float vx = vxSave - clipLeftSave + mFrame.left;
-                float vy = vySave - clipTopSave + mFrame.top;
-
                 IMGStickerTextView tv = new IMGStickerTextView(context);
                 tv.setText(text);
                 tv.setRotation(rotation);
@@ -477,14 +473,25 @@ public class IMGImage {
                 tv.registerCallback((IMGSticker.Callback) parent);
                 addSticker(tv);
 
-                // 延迟到布局完成后设置位置和缩放（此时 getPivotX/Y 才正确）
-                final float targetVx = vx;
-                final float targetVy = vy;
-                final float targetScale = stickerScale;
-                tv.post(() -> {
-                    tv.setScale(targetScale);
-                    tv.setX(targetVx - tv.getPivotX());
-                    tv.setY(targetVy - tv.getPivotY());
+                // 使用 OnGlobalLayoutListener 确保布局完成后再设置位置
+                // 这样 getPivotX/Y 和 mFrame 都是正确的最终值
+                final float vxS = vxSave;
+                final float vyS = vySave;
+                final float cfL = clipLeftSave;
+                final float cfT = clipTopSave;
+                final float sc = stickerScale;
+                tv.getViewTreeObserver().addOnGlobalLayoutListener(
+                        new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+                    @Override
+                    public void onGlobalLayout() {
+                        tv.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                        // 此时 mFrame 已经是最终值（homing 动画已完成）
+                        float vx = vxS - cfL + mFrame.left;
+                        float vy = vyS - cfT + mFrame.top;
+                        tv.setScale(sc);
+                        tv.setX(vx - tv.getPivotX());
+                        tv.setY(vy - tv.getPivotY());
+                    }
                 });
             } catch (JSONException e) {
                 Log.e(TAG, "deserializeStickers failed", e);
