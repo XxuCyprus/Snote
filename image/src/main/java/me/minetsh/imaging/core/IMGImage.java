@@ -567,30 +567,30 @@ public class IMGImage {
     }
 
     private boolean mEraseSessionActive = false;
+    private boolean mEraseStrokeStarted = false;
     private List<IMGPath> mEraseRemoved = new ArrayList<>();
     private List<Integer> mErasePositions = new ArrayList<>();
-    private List<IMGPath> mEraseSnapshot = null;
+    private List<IMGPath> mErasePreState = null;
 
     public void eraseBegin() {
         if (mEraseSessionActive) return;
         mEraseSessionActive = true;
+        mEraseStrokeStarted = false;
         mEraseRemoved.clear();
         mErasePositions.clear();
-        // 擦除开始前保存快照
-        pushHistory();
-        mEraseSnapshot = new ArrayList<>(mDoodles);
+        mErasePreState = null;
     }
 
     public void eraseEnd() {
-        if (mEraseSessionActive && !mEraseRemoved.isEmpty()) {
+        if (mEraseSessionActive && mEraseStrokeStarted && !mEraseRemoved.isEmpty()) {
             // 将当前 undoOp（null占位）替换为 ERASE 操作
             int idx = mHistoryIndex;
             if (idx >= 0 && idx < mUndoOps.size()) {
                 mUndoOps.set(idx, new UndoOp(
                         new ArrayList<>(mEraseRemoved),
                         new ArrayList<>(mErasePositions),
-                        mEraseSnapshot,
-                        new ArrayList<>(mDoodles)  // 保存擦除后的完整状态
+                        mErasePreState,
+                        new ArrayList<>(mDoodles)  // 擦除后完整状态
                 ));
             }
             // 更新 mHistory 当前条目为擦除后的状态
@@ -599,8 +599,8 @@ public class IMGImage {
             }
         }
         mEraseSessionActive = false;
-        mEraseSnapshot = null;
-        // 擦除结束，标记缓存失效，下一帧重建
+        mEraseStrokeStarted = false;
+        mErasePreState = null;
         invalidateDoodlesCache();
     }
 
@@ -635,6 +635,15 @@ public class IMGImage {
     public void eraseDoodleAt(float x, float y, float radius, float scrollX, float scrollY) {
         if (mDoodles.isEmpty()) return;
 
+        // 第一次触摸时保存历史（每个擦除笔画一个独立的撤销步骤）
+        if (!mEraseStrokeStarted) {
+            mEraseStrokeStarted = true;
+            pushHistory();
+            mErasePreState = new ArrayList<>(mDoodles);
+            mEraseRemoved.clear();
+            mErasePositions.clear();
+        }
+
         // 应用与 addPath 相同的坐标变换（屏幕坐标 → 路径存储坐标）
         float[] pt = {x, y};
         M.setTranslate(scrollX, scrollY);
@@ -657,17 +666,12 @@ public class IMGImage {
             } else {
                 // 记录被擦除路径
                 mEraseRemoved.add(path);
-                // 位置记录：用于旧格式兼容，新格式直接用 post 字段
-                int snapIdx = mEraseSnapshot != null ? mEraseSnapshot.indexOf(path) : idx;
+                int snapIdx = mErasePreState.indexOf(path);
                 mErasePositions.add(snapIdx >= 0 ? snapIdx : idx);
                 newDoodles.addAll(parts);
             }
         }
         mDoodles = newDoodles;
-        // 擦除期间不标记缓存失效，等 eraseEnd() 时统一重建
-        if (!mEraseSessionActive) {
-            invalidateDoodlesCache();
-        }
     }
 
     public RectF getClipFrame() {
@@ -802,6 +806,8 @@ public class IMGImage {
             case DOODLE:
                 pushHistory();
                 mDoodles.add(path);
+                // 更新历史条目为添加后的状态（确保序列化时历史与当前一致）
+                mHistory.set(mHistoryIndex, new ArrayList<>(mDoodles));
                 invalidateDoodlesCache();
                 break;
         }
