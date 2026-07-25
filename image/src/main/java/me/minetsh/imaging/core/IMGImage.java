@@ -412,29 +412,35 @@ public class IMGImage {
 
     /**
      * 序列化文字贴纸为 JSON 数组
-     * 坐标存储为原图像素空间（和涂鸦一样的参考系），不受裁切影响
+     * 坐标使用和涂鸦完全一样的变换：View→Bitmap（通过 setTranslate+postRotate+postTranslate+postScale）
      */
     public JSONArray serializeStickers() {
         JSONArray arr = new JSONArray();
         float scale = getScale();
         if (scale <= 0) return arr;
-        float theta = (float) Math.toRadians(-getRotate());
-        float cos = (float) Math.cos(theta);
-        float sin = (float) Math.sin(theta);
+        float invScale = 1f / scale;
+        float rotate = getRotate();
         float cx = mClipFrame.centerX();
         float cy = mClipFrame.centerY();
+        float fl = mFrame.left;
+        float ft = mFrame.top;
 
         for (IMGSticker sticker : mBackStickers) {
             if (sticker instanceof IMGStickerTextView) {
                 IMGStickerTextView tv = (IMGStickerTextView) sticker;
                 try {
-                    // View 坐标 → 原图 Bitmap 像素坐标
+                    // 贴纸中心 View 坐标（和 addPath 的 sx/sy 类似，但无 scroll 偏移）
                     float vx = tv.getX() + tv.getPivotX();
                     float vy = tv.getY() + tv.getPivotY();
-                    float bx = (vx - mFrame.left) / scale;
-                    float by = (vy - mFrame.top) / scale;
-                    float rx = bx * cos + by * sin + cx * (1 - cos) - cy * sin;
-                    float ry = -bx * sin + by * cos + cy * (1 - cos) + cx * sin;
+
+                    // 和涂鸦一样的变换：translate → rotate → translate → scale
+                    float tx = vx - fl;
+                    float ty = vy - ft;
+                    float theta = (float) Math.toRadians(-rotate);
+                    float cos = (float) Math.cos(theta);
+                    float sin = (float) Math.sin(theta);
+                    float rx = (tx * cos - ty * sin + cx * (1 - cos) + cy * sin) * invScale;
+                    float ry = (tx * sin + ty * cos + cy * (1 - cos) - cx * sin) * invScale;
 
                     JSONObject obj = new JSONObject();
                     obj.put("text", tv.getText().toJson());
@@ -453,19 +459,12 @@ public class IMGImage {
 
     /**
      * 反序列化文字贴纸（在主线程调用）
-     * 原图 Bitmap 像素坐标 → View 坐标
-     * 使用 OnGlobalLayoutListener 确保布局完成后再设置位置
+     * Bitmap 坐标存储在 tag 中，每次绘制时自动更新 View 位置
+     * 这样即使 frame 在 homing 动画中变化，贴纸位置也会自动修正
      */
     public void deserializeStickers(JSONArray arr, android.content.Context context,
                                      android.widget.FrameLayout parent) {
         if (arr == null || arr.length() == 0) return;
-        float scale = getScale();
-        if (scale <= 0) return;
-        float theta = (float) Math.toRadians(getRotate());
-        float cos = (float) Math.cos(theta);
-        float sin = (float) Math.sin(theta);
-        float cx = mClipFrame.centerX();
-        float cy = mClipFrame.centerY();
 
         for (int i = 0; i < arr.length(); i++) {
             try {
@@ -476,15 +475,12 @@ public class IMGImage {
                 float stickerScale = (float) obj.optDouble("scale", 1.0);
                 float rotation = (float) obj.optDouble("rotation", 0.0);
 
-                // Bitmap 坐标 → View 坐标
-                float bx = rx * cos + ry * sin + cx * (1 - cos) - cy * sin;
-                float by = -rx * sin + ry * cos + cy * (1 - cos) + cx * sin;
-                float vx = bx * scale + mFrame.left;
-                float vy = by * scale + mFrame.top;
-
                 IMGStickerTextView tv = new IMGStickerTextView(context);
                 tv.setText(text);
                 tv.setRotation(rotation);
+
+                // 存储 Bitmap 坐标到 tag，供 updateStickerPositions() 使用
+                tv.setTag(new float[]{rx, ry, stickerScale});
 
                 android.widget.FrameLayout.LayoutParams lp =
                         new android.widget.FrameLayout.LayoutParams(
@@ -493,25 +489,65 @@ public class IMGImage {
                 parent.addView(tv, lp);
                 tv.registerCallback((IMGSticker.Callback) parent);
                 addSticker(tv);
-
-                // 延迟到布局完成后设置位置（此时 getPivotX/Y 才正确）
-                final float targetVx = vx;
-                final float targetVy = vy;
-                final float targetScale = stickerScale;
-                tv.getViewTreeObserver().addOnGlobalLayoutListener(
-                        new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
-                    @Override
-                    public void onGlobalLayout() {
-                        tv.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                        tv.setScale(targetScale);
-                        tv.setX(targetVx - tv.getPivotX());
-                        tv.setY(targetVy - tv.getPivotY());
-                    }
-                });
             } catch (JSONException e) {
                 Log.e(TAG, "deserializeStickers failed", e);
             }
         }
+    }
+
+    // 记录上次更新贴纸位置时的 frame，用于检测 frame 变化
+    private android.graphics.RectF mLastStickerFrame = new android.graphics.RectF();
+
+    /**
+     * 更新所有带 tag 的贴纸位置（Bitmap 坐标 → View 坐标）
+     * 每次 onDraw 调用，frame 变化时自动更新，确保贴纸跟随图片移动
+     * frame 稳定后（homing 结束）自动停止更新
+     */
+    public boolean updateStickerPositions(android.widget.FrameLayout parent) {
+        // 检查 frame 是否变化
+        if (mFrame.equals(mLastStickerFrame)) return false;
+        mLastStickerFrame.set(mFrame);
+
+        float scale = getScale();
+        if (scale <= 0) return false;
+        float invScale = 1f / scale;
+        float rotate = getRotate();
+        float cx = mClipFrame.centerX();
+        float cy = mClipFrame.centerY();
+        float fl = mFrame.left;
+        float ft = mFrame.top;
+        boolean updated = false;
+
+        for (int i = 0; i < parent.getChildCount(); i++) {
+            android.view.View child = parent.getChildAt(i);
+            Object tag = child.getTag();
+            if (tag instanceof float[]) {
+                float[] data = (float[]) tag;
+                float rx = data[0], ry = data[1], sc = data[2];
+
+                // Bitmap → View（逆变换：scale → translate → rotate → translate）
+                float sx = rx * invScale + fl;
+                float sy = ry * invScale + ft;
+                float theta = (float) Math.toRadians(rotate);
+                float cos = (float) Math.cos(theta);
+                float sin = (float) Math.sin(theta);
+                float vx = (sx - fl) * cos - (sy - ft) * sin + fl
+                        + cx * (1 - cos) + cy * sin;
+                float vy = (sx - fl) * sin + (sy - ft) * cos + ft
+                        + cy * (1 - cos) - cx * sin;
+
+                if (child.getWidth() > 0 && child.getHeight() > 0) {
+                    child.setPivotX(child.getWidth() / 2f);
+                    child.setPivotY(child.getHeight() / 2f);
+                }
+                child.setScaleX(sc);
+                child.setScaleY(sc);
+                child.setX(vx - child.getPivotX());
+                child.setY(vy - child.getPivotY());
+                updated = true;
+            }
+        }
+        return updated;
     }
 
     /**
