@@ -66,7 +66,7 @@ public class IMGEditActivity extends IMGEditBaseActivity {
 
         android.widget.TextView text = new android.widget.TextView(this);
         text.setGravity(android.view.Gravity.CENTER);
-        text.setTextColor(0xFF333333);
+        text.setTextColor(0xFF212121);  // 深黑色，确保在白底可见
         text.setTextSize(16);
         text.setPadding(0, (int) (20 * getResources().getDisplayMetrics().density), 0, 0);
         text.setId(android.R.id.text1);
@@ -129,13 +129,11 @@ public class IMGEditActivity extends IMGEditBaseActivity {
                 final String json = doodleJson;
                 final int count = undoCount;
 
-                // 在后台线程执行反序列化（重建 700 步历史很重）
-                if (json != null && !json.isEmpty()) {
-                    mImgView.deserializeDoodles(json);
-                }
-
+                // 文件读取在后台，但反序列化必须在主线程（避免与 onDraw 并发）
+                // JSON 解析（14000+ 路径点重建）仍较重，但这是唯一安全的方式
                 runOnUiThread(() -> {
                     if (json != null && !json.isEmpty()) {
+                        mImgView.deserializeDoodles(json);
                         if (!mImgView.isDoodleEmpty()) {
                             mImgView.post(() -> {
                                 mImgView.setMode(IMGMode.DOODLE);
