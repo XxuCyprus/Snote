@@ -597,6 +597,13 @@ public class IMGImage {
                         new ArrayList<>(mDoodles)  // 擦除后完整状态
                 ));
             }
+        } else if (mEraseSessionActive && mEraseStrokeStarted) {
+            // 擦除笔画没有实际擦除任何东西：回退 pushHistory() 创建的幽灵条目
+            if (mHistory.size() > 1 && mHistoryIndex == mHistory.size() - 1) {
+                mHistory.remove(mHistory.size() - 1);
+                mUndoOps.remove(mUndoOps.size() - 1);
+                mHistoryIndex = mHistory.size() - 1;
+            }
         }
         mEraseSessionActive = false;
         mEraseStrokeStarted = false;
