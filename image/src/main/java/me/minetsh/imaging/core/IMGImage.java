@@ -218,6 +218,26 @@ public class IMGImage {
         }
     }
 
+    /**
+     * 擦除涂鸦中靠近 (x, y) 的路径部分
+     * @param scale 当前视图缩放比例，用于将屏幕坐标转换为图片坐标
+     */
+    public void eraseDoodleAt(float x, float y, float radius, float scale) {
+        if (mDoodles.isEmpty()) return;
+
+        // 将屏幕坐标转换为图片坐标
+        float imgX = (x - mFrame.left) / scale;
+        float imgY = (y - mFrame.top) / scale;
+        float imgR = radius / scale;
+
+        List<IMGPath> newDoodles = new ArrayList<>();
+        for (IMGPath path : mDoodles) {
+            List<IMGPath> parts = path.eraseNear(imgX, imgY, imgR);
+            newDoodles.addAll(parts);
+        }
+        mDoodles = newDoodles;
+    }
+
     public RectF getClipFrame() {
         return mClipFrame;
     }

@@ -361,7 +361,8 @@ fun ReaderScreen(
                         onImageClick = { path -> fullscreenImagePath = path },
                         onVideoClick = { path -> videoTargetPath = path },
                         onImageEdit = { path, itemId ->
-                            val saveFile = File(context.cacheDir, "edited_${UUID.randomUUID()}.jpg")
+                            val parentDir = File(path).parentFile
+                            val saveFile = File(parentDir, "edited_${UUID.randomUUID()}.jpg")
                             pendingEditSavePath = saveFile.absolutePath
                             pendingEditItemId = itemId
                             val intent = Intent(context, IMGEditActivity::class.java)

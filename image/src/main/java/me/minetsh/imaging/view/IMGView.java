@@ -56,6 +56,12 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
 
     private Paint mDoodlePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
+    private boolean mIsEraser = false;
+
+    private float mPenStrokeWidth = IMGPath.BASE_DOODLE_WIDTH;
+
+    private float mEraserSize = 48f;
+
     private static final boolean DEBUG = true;
 
     {
@@ -162,6 +168,31 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         mPen.setColor(color);
     }
 
+    public void setEraserMode(boolean eraser) {
+        mIsEraser = eraser;
+    }
+
+    public boolean isEraserMode() {
+        return mIsEraser;
+    }
+
+    public void setPenStrokeWidth(float width) {
+        mPenStrokeWidth = width;
+        mPen.setWidth(width);
+    }
+
+    public float getPenStrokeWidth() {
+        return mPenStrokeWidth;
+    }
+
+    public void setEraserSize(float size) {
+        mEraserSize = size;
+    }
+
+    public float getEraserSize() {
+        return mEraserSize;
+    }
+
     public boolean isDoodleEmpty() {
         return mImage.isDoodleEmpty();
     }
@@ -194,7 +225,7 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         mImage.onDrawDoodles(canvas);
         if (mImage.getMode() == IMGMode.DOODLE && !mPen.isEmpty()) {
             mDoodlePaint.setColor(mPen.getColor());
-            mDoodlePaint.setStrokeWidth(IMGPath.BASE_DOODLE_WIDTH * mImage.getScale());
+            mDoodlePaint.setStrokeWidth(mPenStrokeWidth * mImage.getScale());
             canvas.save();
             RectF frame = mImage.getClipFrame();
             canvas.rotate(-mImage.getRotate(), frame.centerX(), frame.centerY());
@@ -343,6 +374,8 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
 
         if (mode == IMGMode.NONE || mode == IMGMode.CLIP) {
             handled |= onTouchNONE(event);
+        } else if (mode == IMGMode.DOODLE && mIsEraser) {
+            handled |= onTouchEraser(event);
         } else if (mPointerCount > 1) {
             onPathDone();
             handled |= onTouchNONE(event);
@@ -405,6 +438,20 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         mPen.reset();
         invalidate();
         return true;
+    }
+
+    private boolean onTouchEraser(MotionEvent event) {
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+            case MotionEvent.ACTION_MOVE:
+                mImage.eraseDoodleAt(event.getX(), event.getY(), mEraserSize, mImage.getScale());
+                invalidate();
+                return true;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                return true;
+        }
+        return false;
     }
 
     @Override
@@ -599,7 +646,7 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         }
 
         IMGPath toPath() {
-            return new IMGPath(new Path(this.path), getMode(), getColor());
+            return new IMGPath(new Path(this.path), getMode(), getColor(), getWidth());
         }
     }
 }
