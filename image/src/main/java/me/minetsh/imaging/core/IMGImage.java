@@ -450,7 +450,6 @@ public class IMGImage {
                             + ", new mHistoryIndex=" + mHistoryIndex);
                     }
                 } else if (root.has("history")) {
-                } else if (root.has("history")) {
                     JSONArray histArr = root.getJSONArray("history");
                     for (int i = 0; i < histArr.length(); i++) {
                         mHistory.add(IMGPath.listFromJson(histArr.getJSONArray(i)));
