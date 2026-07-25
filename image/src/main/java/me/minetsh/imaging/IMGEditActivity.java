@@ -323,12 +323,8 @@ public class IMGEditActivity extends IMGEditBaseActivity {
             org.json.JSONArray stickerArr = mImgView.serializeStickers();
             boolean hasStickers = stickerArr.length() > 0;
 
-            // 步骤1：保存干净JPEG（无贴纸）到 _clean.jpg → 用于重新编辑
-            java.util.List<me.minetsh.imaging.core.sticker.IMGSticker> stickerBackup =
-                    mImgView.clearStickersForSave();
-            Bitmap cleanBitmap = mImgView.saveBitmap();
-            mImgView.restoreStickers(stickerBackup);
-
+            // 步骤1：保存纯底图（无涂鸦、无贴纸）到 _clean.jpg → 编辑器加载此图作为底图
+            Bitmap cleanBitmap = mImgView.saveCleanBitmap();
             if (cleanBitmap == null) {
                 runOnUiThread(() -> {
                     if (mCurrentDialog != null) mCurrentDialog.dismiss();
@@ -351,31 +347,20 @@ public class IMGEditActivity extends IMGEditBaseActivity {
             }
             cleanBitmap.recycle();
 
-            // 步骤2：有贴纸时覆盖保存含贴纸的JPEG到 savePath → 用于内容页显示
-            if (hasStickers) {
-                mImgView.prepareForSaveStickers();
-                Bitmap displayBitmap = mImgView.saveBitmap();
-                if (displayBitmap != null) {
-                    FileOutputStream dfout = null;
-                    try {
-                        dfout = new FileOutputStream(savePath);
-                        displayBitmap.compress(Bitmap.CompressFormat.JPEG, 95, dfout);
-                    } catch (FileNotFoundException e) {
-                        Log.e(TAG, "onDoneClick: compress display failed", e);
-                    } finally {
-                        if (dfout != null) { try { dfout.close(); } catch (IOException ignored) {} }
-                    }
-                    displayBitmap.recycle();
-                }
-            } else {
-                // 无贴纸：clean = display，直接复制
+            // 步骤2：保存含涂鸦+贴纸的JPEG到 savePath → 内容页显示用
+            // 涂鸦+贴纸从JSON恢复，不再烘焙到 _clean.jpg
+            Bitmap displayBitmap = mImgView.saveBitmap();
+            if (displayBitmap != null) {
+                FileOutputStream dfout = null;
                 try {
-                    java.io.FileInputStream fis = new java.io.FileInputStream(cleanPath);
-                    FileOutputStream fos = new FileOutputStream(savePath);
-                    byte[] buf = new byte[8192]; int n;
-                    while ((n = fis.read(buf)) > 0) fos.write(buf, 0, n);
-                    fis.close(); fos.close();
-                } catch (IOException ignored) {}
+                    dfout = new FileOutputStream(savePath);
+                    displayBitmap.compress(Bitmap.CompressFormat.JPEG, 95, dfout);
+                } catch (FileNotFoundException e) {
+                    Log.e(TAG, "onDoneClick: compress display failed", e);
+                } finally {
+                    if (dfout != null) { try { dfout.close(); } catch (IOException ignored) {} }
+                }
+                displayBitmap.recycle();
             }
 
             // 序列化涂鸦 + 贴纸到 JSON
