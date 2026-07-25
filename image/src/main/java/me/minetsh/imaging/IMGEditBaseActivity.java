@@ -164,6 +164,12 @@ abstract class IMGEditBaseActivity extends Activity implements View.OnClickListe
 
     @Override
     public final void onCheckedChanged(RadioGroup group, int checkedId) {
+        // 选择颜色时自动退出橡皮擦模式
+        if (mImgView.isEraserMode()) {
+            mImgView.setEraserMode(false);
+            mEraserBtn.setSelected(false);
+            mStrokeWidthBar.setProgress((int) mImgView.getPenStrokeWidth());
+        }
         onColorChanged(mColorGroup.getCheckColor());
     }
 

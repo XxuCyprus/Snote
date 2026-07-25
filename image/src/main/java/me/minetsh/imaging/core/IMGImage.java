@@ -102,6 +102,11 @@ public class IMGImage {
      */
     private List<IMGPath> mDoodles = new ArrayList<>();
 
+    /**
+     * 撤销栈（用于橡皮擦操作的整笔恢复）
+     */
+    private List<List<IMGPath>> mUndoStack = new ArrayList<>();
+
     private static final int MIN_SIZE = 500;
 
     private static final int MAX_SIZE = 10000;
@@ -213,9 +218,19 @@ public class IMGImage {
     }
 
     public void undoDoodle() {
-        if (!mDoodles.isEmpty()) {
+        // 优先从撤销栈恢复（橡皮擦操作）
+        if (!mUndoStack.isEmpty()) {
+            mDoodles = mUndoStack.remove(mUndoStack.size() - 1);
+        } else if (!mDoodles.isEmpty()) {
             mDoodles.remove(mDoodles.size() - 1);
         }
+    }
+
+    /**
+     * 橡皮擦开始触摸时，保存当前涂鸦状态到撤销栈
+     */
+    public void eraseBegin() {
+        mUndoStack.add(new ArrayList<>(mDoodles));
     }
 
     /**

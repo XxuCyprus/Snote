@@ -393,7 +393,10 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
                 mImage.onTouchUp(getScrollX(), getScrollY());
-                onHoming();
+                // 橡皮擦模式下跳过归位动画，避免涂鸦短暂压缩
+                if (!mIsEraser) {
+                    onHoming();
+                }
                 break;
         }
 
@@ -446,6 +449,10 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
     private boolean onTouchEraser(MotionEvent event) {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                mImage.eraseBegin();
+                mImage.eraseDoodleAt(event.getX(), event.getY(), mEraserSize, getScrollX(), getScrollY());
+                invalidate();
+                return true;
             case MotionEvent.ACTION_MOVE:
                 mImage.eraseDoodleAt(event.getX(), event.getY(), mEraserSize, getScrollX(), getScrollY());
                 invalidate();
