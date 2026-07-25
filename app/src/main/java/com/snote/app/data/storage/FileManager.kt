@@ -114,10 +114,11 @@ class FileManager {
     fun deleteFile(dataDir: File, relativePath: String): Boolean {
         val file = File(dataDir, relativePath)
         val mainDeleted = if (file.exists()) file.delete() else true
-        // 清理图片编辑伴生文件（.strokes、.base、.doodles.json）
+        // 清理图片编辑伴生文件
         File(dataDir, "$relativePath.strokes").let { if (it.exists()) it.delete() }
         File(dataDir, "$relativePath.base").let { if (it.exists()) it.delete() }
         File(dataDir, "$relativePath.doodles.json").let { if (it.exists()) it.delete() }
+        File(dataDir, "${relativePath}_clean.jpg").let { if (it.exists()) it.delete() }
         return mainDeleted
     }
 
