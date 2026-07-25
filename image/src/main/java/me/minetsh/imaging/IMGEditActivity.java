@@ -41,6 +41,11 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         String doodleJson = getIntent().getStringExtra(EXTRA_DOODLE_JSON);
         if (doodleJson != null && !doodleJson.isEmpty()) {
             mImgView.deserializeDoodles(doodleJson);
+            // 有已有涂鸦时自动进入涂鸦模式，否则撤销按钮不响应
+            if (!mImgView.isDoodleEmpty()) {
+                mImgView.setMode(IMGMode.DOODLE);
+                updateModeUI();
+            }
         }
     }
 

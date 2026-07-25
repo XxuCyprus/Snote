@@ -283,6 +283,7 @@ public class IMGImage {
 
     /**
      * 从 JSON 反序列化涂鸦状态
+     * 不加载旧的 undo/redo stack（可能格式不兼容），而是重建一个干净的 undo stack
      */
     public void deserializeDoodles(String json) {
         if (json == null) return;
@@ -291,21 +292,15 @@ public class IMGImage {
 
             mDoodles = IMGPath.listFromJson(root.getJSONArray("doodles"));
 
+            // 重建 undo stack：从空状态到当前状态，每步多一个 doodle
+            // 栈底 = 空列表，栈顶 = 只差最后一个 doodle 的状态
+            // 这样每次 pop 移除恰好一个 doodle
             mUndoStack.clear();
-            if (root.has("undoStack")) {
-                JSONArray undoArr = root.getJSONArray("undoStack");
-                for (int i = 0; i < undoArr.length(); i++) {
-                    mUndoStack.add(IMGPath.listFromJson(undoArr.getJSONArray(i)));
-                }
+            for (int i = 0; i < mDoodles.size(); i++) {
+                mUndoStack.add(new ArrayList<>(mDoodles.subList(0, i)));
             }
 
             mRedoStack.clear();
-            if (root.has("redoStack")) {
-                JSONArray redoArr = root.getJSONArray("redoStack");
-                for (int i = 0; i < redoArr.length(); i++) {
-                    mRedoStack.add(IMGPath.listFromJson(redoArr.getJSONArray(i)));
-                }
-            }
         } catch (JSONException e) {
             Log.e(TAG, "deserializeDoodles failed", e);
         }
