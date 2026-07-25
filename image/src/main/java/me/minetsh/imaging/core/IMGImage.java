@@ -383,11 +383,19 @@ public class IMGImage {
                             mUndoOps.add(null);
                         } else if (type.equals("e")) {
                             List<IMGPath> snapshot = IMGPath.listFromJson(entry.getJSONArray("snap"));
-                            mHistory.add(snapshot);
                             List<IMGPath> removed = IMGPath.listFromJson(entry.getJSONArray("r"));
                             JSONArray posArr = entry.getJSONArray("pos");
                             List<Integer> positions = new ArrayList<>();
                             for (int j = 0; j < posArr.length(); j++) positions.add(posArr.getInt(j));
+                            // 从 snapshot 中移除被擦除路径，得到擦除后状态
+                            List<IMGPath> afterErase = new ArrayList<>(snapshot);
+                            for (int j = positions.size() - 1; j >= 0; j--) {
+                                int pos = positions.get(j);
+                                if (pos >= 0 && pos < afterErase.size()) {
+                                    afterErase.remove(pos);
+                                }
+                            }
+                            mHistory.add(afterErase);
                             mUndoOps.add(new UndoOp(removed, positions, snapshot));
                         }
                     }
@@ -463,14 +471,19 @@ public class IMGImage {
                 tv.registerCallback((IMGSticker.Callback) parent);
                 addSticker(tv);
 
-                // 延迟到布局完成后设置位置和缩放
+                // 延迟到布局完成后再设置位置（此时 getPivotX/Y 才正确）
                 final float vx = x;
                 final float vy = y;
                 final float sc = stickerScale;
-                tv.post(() -> {
-                    tv.setScale(sc);
-                    tv.setX(vx);
-                    tv.setY(vy);
+                tv.getViewTreeObserver().addOnGlobalLayoutListener(
+                        new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+                    @Override
+                    public void onGlobalLayout() {
+                        tv.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                        tv.setScale(sc);
+                        tv.setX(vx);
+                        tv.setY(vy);
+                    }
                 });
             } catch (JSONException e) {
                 Log.e(TAG, "deserializeStickers failed", e);
@@ -518,8 +531,8 @@ public class IMGImage {
 
     public void eraseEnd() {
         if (mEraseSessionActive && !mEraseRemoved.isEmpty()) {
-            // 将最后一个 undoOp（null占位）替换为 ERASE 操作
-            int idx = mHistoryIndex - 1;
+            // 将当前 undoOp（null占位）替换为 ERASE 操作
+            int idx = mHistoryIndex;
             if (idx >= 0 && idx < mUndoOps.size()) {
                 mUndoOps.set(idx, new UndoOp(
                         new ArrayList<>(mEraseRemoved),
