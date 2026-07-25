@@ -222,6 +222,14 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         mImage.deserializeDoodles(json);
     }
 
+    public void clearDoodlesTemporarily() {
+        mImage.clearDoodlesTemporarily();
+    }
+
+    public void restoreDoodles() {
+        mImage.restoreDoodles();
+    }
+
     public IMGMode getMode() {
         return mImage.getMode();
     }

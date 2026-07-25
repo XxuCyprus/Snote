@@ -14,6 +14,7 @@ import me.minetsh.imaging.core.file.IMGDecoder;
 import me.minetsh.imaging.core.file.IMGFileDecoder;
 import me.minetsh.imaging.core.util.IMGUtils;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -58,6 +59,15 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         }
         if (uri == null) {
             return null;
+        }
+
+        // 优先加载 .base 干净底图（无涂鸦），用于二次编辑时撤销/重做
+        String uriPath = uri.getPath();
+        if (uriPath != null) {
+            File baseFile = new File(uriPath + ".base");
+            if (baseFile.exists()) {
+                uri = Uri.fromFile(baseFile);
+            }
         }
 
         IMGDecoder decoder = null;
@@ -165,11 +175,30 @@ public class IMGEditActivity extends IMGEditBaseActivity {
                     }
                 }
 
-                // 将涂鸦数据放入返回 Intent（由调用方负责持久化）
+                // 生成干净底图（无涂鸦，供二次编辑时撤销/重做）
+                mImgView.clearDoodlesTemporarily();
+                Bitmap cleanBitmap = mImgView.saveBitmap();
+                mImgView.restoreDoodles();
+                if (cleanBitmap != null) {
+                    try {
+                        File baseFile = new File(path + ".base");
+                        FileOutputStream baseFout = new FileOutputStream(baseFile);
+                        cleanBitmap.compress(Bitmap.CompressFormat.JPEG, 95, baseFout);
+                        baseFout.flush();
+                        baseFout.getFD().sync();
+                        baseFout.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    cleanBitmap.recycle();
+                }
+
+                // 将涂鸦数据放入返回 Intent
                 String doodleJson = mImgView.serializeDoodles();
                 Intent resultIntent = new Intent();
                 resultIntent.putExtra(EXTRA_DOODLE_JSON, doodleJson);
                 setResult(RESULT_OK, resultIntent);
+                bitmap.recycle();
                 finish();
                 return;
             }

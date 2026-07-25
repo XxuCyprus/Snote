@@ -116,6 +116,11 @@ public class IMGImage {
      */
     private List<List<IMGPath>> mRedoStack = new ArrayList<>();
 
+    /**
+     * 临时隐藏涂鸦（用于生成干净底图）
+     */
+    private List<IMGPath> mDoodlesBackup = null;
+
     private static final int MIN_SIZE = 500;
 
     private static final int MAX_SIZE = 10000;
@@ -312,6 +317,24 @@ public class IMGImage {
     public void eraseBegin() {
         mUndoStack.add(new ArrayList<>(mDoodles));
         mRedoStack.clear();
+    }
+
+    /**
+     * 临时隐藏涂鸦（生成干净底图时用）
+     */
+    public void clearDoodlesTemporarily() {
+        mDoodlesBackup = new ArrayList<>(mDoodles);
+        mDoodles = new ArrayList<>();
+    }
+
+    /**
+     * 恢复涂鸦（生成干净底图后调用）
+     */
+    public void restoreDoodles() {
+        if (mDoodlesBackup != null) {
+            mDoodles = mDoodlesBackup;
+            mDoodlesBackup = null;
+        }
     }
 
     /**

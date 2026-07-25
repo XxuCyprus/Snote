@@ -421,6 +421,7 @@ class DataRepository @Inject constructor(
                 }
                 // 清理旧文件的伴生文件
                 File(dataDir, "$oldPath.doodles.json").let { if (it.exists()) it.delete() }
+                File(dataDir, "$oldPath.base").let { if (it.exists()) it.delete() }
             }
         }
     }
