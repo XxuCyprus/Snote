@@ -330,10 +330,9 @@ public class IMGImage {
             JSONObject root = new JSONObject();
             root.put("doodles", IMGPath.listToJson(mDoodles));
 
-            // 只序列化最近 MAX_SERIALIZED_HISTORY 条撤销操作
-            int start = Math.max(0, mUndoOps.size() - MAX_SERIALIZED_HISTORY);
+            // 保存全部撤销操作（pushHistory 已限制最多 MAX_HISTORY 条）
             JSONArray undoArr = new JSONArray();
-            for (int i = start; i < mUndoOps.size(); i++) {
+            for (int i = 0; i < mUndoOps.size(); i++) {
                 UndoOp op = mUndoOps.get(i);
                 JSONObject entry = new JSONObject();
                 if (op == null) {
@@ -357,7 +356,6 @@ public class IMGImage {
             root.put("undo", undoArr);
             Log.d(TAG, "serializeDoodles: mHistory.size=" + mHistory.size()
                 + ", mUndoOps.size=" + mUndoOps.size()
-                + ", start=" + start
                 + ", undoArr.length=" + undoArr.length()
                 + ", mHistoryIndex=" + mHistoryIndex
                 + ", currentDoodles=" + mDoodles.size());
@@ -422,7 +420,8 @@ public class IMGImage {
                     boolean matches = lastHistory.size() == mDoodles.size();
                     if (matches) {
                         for (int i = 0; i < mDoodles.size(); i++) {
-                            if (lastHistory.get(i) != mDoodles.get(i)) { matches = false; break; }
+                            // 比较路径内容而非对象引用
+                            if (!lastHistory.get(i).equals(mDoodles.get(i))) { matches = false; break; }
                         }
                     }
                     Log.d(TAG, "deserializeDoodles: rebuilt history, size=" + mHistory.size()
@@ -430,6 +429,14 @@ public class IMGImage {
                         + ", lastHistorySize=" + lastHistory.size()
                         + ", currentDoodlesSize=" + mDoodles.size()
                         + ", matches=" + matches);
+                    if (!matches) {
+                        // 历史与当前状态不一致，添加当前状态作为额外条目
+                        mHistory.add(new ArrayList<>(mDoodles));
+                        mUndoOps.add(null);
+                        mHistoryIndex = mHistory.size() - 1;
+                        Log.d(TAG, "deserializeDoodles: added current state, new size=" + mHistory.size()
+                            + ", new mHistoryIndex=" + mHistoryIndex);
+                    }
                 } else if (root.has("history")) {
                 } else if (root.has("history")) {
                     JSONArray histArr = root.getJSONArray("history");

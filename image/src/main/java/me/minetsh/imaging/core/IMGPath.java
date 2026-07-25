@@ -272,4 +272,22 @@ public class IMGPath {
         }
         return result;
     }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (!(obj instanceof IMGPath)) return false;
+        IMGPath other = (IMGPath) obj;
+        if (color != other.color) return false;
+        if (Float.compare(width, other.width) != 0) return false;
+        if (mode != other.mode) return false;
+        // 比较路径点
+        float[] pts1 = approximatePathPoints();
+        float[] pts2 = other.approximatePathPoints();
+        if (pts1.length != pts2.length) return false;
+        for (int i = 0; i < pts1.length; i++) {
+            if (Float.compare(pts1[i], pts2[i]) != 0) return false;
+        }
+        return true;
+    }
 }
