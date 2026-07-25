@@ -77,6 +77,9 @@ public class IMGEditActivity extends IMGEditBaseActivity {
                 BitmapFactory.decodeFile(baseFile.getAbsolutePath(), checkOpts);
                 if (checkOpts.outWidth > 0 && checkOpts.outHeight > 0) {
                     uri = Uri.fromFile(baseFile);
+                } else {
+                    // 无效文件，删除之（下次编辑会重新生成）
+                    baseFile.delete();
                 }
             }
         }
