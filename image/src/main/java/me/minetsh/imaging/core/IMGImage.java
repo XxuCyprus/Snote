@@ -130,11 +130,13 @@ public class IMGImage {
         final List<IMGPath> removed;
         final List<Integer> positions;
         final List<IMGPath> preEraseSnapshot;
+        final List<IMGPath> postEraseState;
 
-        UndoOp(List<IMGPath> removed, List<Integer> positions, List<IMGPath> snapshot) {
+        UndoOp(List<IMGPath> removed, List<Integer> positions, List<IMGPath> snapshot, List<IMGPath> postState) {
             this.removed = removed;
             this.positions = positions;
             this.preEraseSnapshot = snapshot;
+            this.postEraseState = postState;
         }
     }
 
@@ -350,6 +352,9 @@ public class IMGImage {
                     for (int p : op.positions) posArr.put(p);
                     entry.put("pos", posArr);
                     entry.put("snap", IMGPath.listToJson(op.preEraseSnapshot));
+                    if (op.postEraseState != null) {
+                        entry.put("post", IMGPath.listToJson(op.postEraseState));
+                    }
                 }
                 undoArr.put(entry);
             }
@@ -403,16 +408,22 @@ public class IMGImage {
                             JSONArray posArr = entry.getJSONArray("pos");
                             List<Integer> positions = new ArrayList<>();
                             for (int j = 0; j < posArr.length(); j++) positions.add(posArr.getInt(j));
-                            // 从 snapshot 中移除被擦除路径，得到擦除后状态
-                            List<IMGPath> afterErase = new ArrayList<>(snapshot);
-                            for (int j = positions.size() - 1; j >= 0; j--) {
-                                int pos = positions.get(j);
-                                if (pos >= 0 && pos < afterErase.size()) {
-                                    afterErase.remove(pos);
+                            List<IMGPath> afterErase;
+                            if (entry.has("post")) {
+                                // 新格式：直接使用存储的擦除后状态（最可靠）
+                                afterErase = IMGPath.listFromJson(entry.getJSONArray("post"));
+                            } else {
+                                // 旧格式：从 snapshot 中移除被擦除路径
+                                afterErase = new ArrayList<>(snapshot);
+                                for (int j = positions.size() - 1; j >= 0; j--) {
+                                    int pos = positions.get(j);
+                                    if (pos >= 0 && pos < afterErase.size()) {
+                                        afterErase.remove(pos);
+                                    }
                                 }
                             }
                             mHistory.add(afterErase);
-                            mUndoOps.add(new UndoOp(removed, positions, snapshot));
+                            mUndoOps.add(new UndoOp(removed, positions, snapshot, afterErase));
                         }
                     }
                     mHistoryIndex = mHistory.size() - 1;
@@ -578,8 +589,13 @@ public class IMGImage {
                 mUndoOps.set(idx, new UndoOp(
                         new ArrayList<>(mEraseRemoved),
                         new ArrayList<>(mErasePositions),
-                        mEraseSnapshot
+                        mEraseSnapshot,
+                        new ArrayList<>(mDoodles)  // 保存擦除后的完整状态
                 ));
+            }
+            // 更新 mHistory 当前条目为擦除后的状态
+            if (idx >= 0 && idx < mHistory.size()) {
+                mHistory.set(idx, new ArrayList<>(mDoodles));
             }
         }
         mEraseSessionActive = false;
@@ -639,19 +655,11 @@ public class IMGImage {
             if (parts.size() == 1 && parts.get(0) == path) {
                 newDoodles.add(path);
             } else {
-                // 记录被擦除路径和原始快照中的位置
+                // 记录被擦除路径
                 mEraseRemoved.add(path);
-                if (mEraseSnapshot != null) {
-                    int origPos = mEraseSnapshot.indexOf(path);
-                    // 计算offset：之前已移除的、在origPos之前的路径数量
-                    int offset = 0;
-                    for (int j = 0; j < mEraseRemoved.size() - 1; j++) {
-                        if (mErasePositions.get(j) < origPos) offset++;
-                    }
-                    mErasePositions.add(origPos - offset);
-                } else {
-                    mErasePositions.add(idx);
-                }
+                // 位置记录：用于旧格式兼容，新格式直接用 post 字段
+                int snapIdx = mEraseSnapshot != null ? mEraseSnapshot.indexOf(path) : idx;
+                mErasePositions.add(snapIdx >= 0 ? snapIdx : idx);
                 newDoodles.addAll(parts);
             }
         }
