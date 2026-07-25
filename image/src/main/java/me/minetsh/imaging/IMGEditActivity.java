@@ -14,12 +14,9 @@ import me.minetsh.imaging.core.file.IMGDecoder;
 import me.minetsh.imaging.core.file.IMGFileDecoder;
 import me.minetsh.imaging.core.util.IMGUtils;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 
 /**
  * Created by felix on 2017/11/14 下午2:26.
@@ -66,15 +63,6 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         }
         if (uri == null) {
             return null;
-        }
-
-        // 优先加载 .base 干净底图（无涂鸦），用于二次编辑时撤销/重做
-        String uriPath = uri.getPath();
-        if (uriPath != null) {
-            File baseFile = new File(uriPath + ".base");
-            if (baseFile.exists()) {
-                uri = Uri.fromFile(baseFile);
-            }
         }
 
         IMGDecoder decoder = null;
@@ -182,40 +170,6 @@ public class IMGEditActivity extends IMGEditBaseActivity {
                     }
                 }
                 bitmap.recycle();
-
-                // 复制原始图片为 .base 干净底图（无涂鸦，供二次编辑时撤销/重做）
-                Uri imageUri;
-                Intent intent = getIntent();
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    imageUri = intent.getParcelableExtra(EXTRA_IMAGE_URI, Uri.class);
-                } else {
-                    imageUri = intent.getParcelableExtra(EXTRA_IMAGE_URI);
-                }
-                if (imageUri != null) {
-                    String imagePath = imageUri.getPath();
-                    if (imagePath != null) {
-                        // 如果原图本身就有 .base 文件，用它；否则用原图
-                        String baseSourcePath = imagePath + ".base";
-                        if (!new File(baseSourcePath).exists()) {
-                            baseSourcePath = imagePath;
-                        }
-                        try {
-                            java.io.InputStream in = new java.io.FileInputStream(baseSourcePath);
-                            FileOutputStream baseFout = new FileOutputStream(path + ".base");
-                            byte[] buf = new byte[8192];
-                            int len;
-                            while ((len = in.read(buf)) > 0) {
-                                baseFout.write(buf, 0, len);
-                            }
-                            in.close();
-                            baseFout.flush();
-                            baseFout.getFD().sync();
-                            baseFout.close();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }
 
                 // 将涂鸦数据放入返回 Intent
                 String doodleJson = mImgView.serializeDoodles();
