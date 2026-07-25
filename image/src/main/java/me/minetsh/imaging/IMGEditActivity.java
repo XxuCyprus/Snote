@@ -319,16 +319,17 @@ public class IMGEditActivity extends IMGEditBaseActivity {
             // 先将所有贴纸移到背景列表（包括前景中的贴纸）
             mImgView.prepareForSaveStickers();
 
-            // 序列化文字贴纸数据（用于重新编辑时恢复）
+            // 序列化文字贴纸数据
             org.json.JSONArray stickerArr = mImgView.serializeStickers();
+            boolean hasStickers = stickerArr.length() > 0;
 
-            // 保存不含贴纸的干净JPEG（贴纸由JSON独立恢复，避免双重显示）
+            // 步骤1：保存干净JPEG（无贴纸）到 _clean.jpg → 用于重新编辑
             java.util.List<me.minetsh.imaging.core.sticker.IMGSticker> stickerBackup =
                     mImgView.clearStickersForSave();
-            Bitmap bitmap = mImgView.saveBitmap();
+            Bitmap cleanBitmap = mImgView.saveBitmap();
             mImgView.restoreStickers(stickerBackup);
 
-            if (bitmap == null) {
+            if (cleanBitmap == null) {
                 runOnUiThread(() -> {
                     if (mCurrentDialog != null) mCurrentDialog.dismiss();
                     dismissLoadingDialog();
@@ -338,30 +339,56 @@ public class IMGEditActivity extends IMGEditBaseActivity {
                 return;
             }
 
-            // 序列化涂鸦 + 文字贴纸
+            String cleanPath = savePath + "_clean.jpg";
+            FileOutputStream fout = null;
+            try {
+                fout = new FileOutputStream(cleanPath);
+                cleanBitmap.compress(Bitmap.CompressFormat.JPEG, 95, fout);
+            } catch (FileNotFoundException e) {
+                Log.e(TAG, "onDoneClick: compress clean failed", e);
+            } finally {
+                if (fout != null) { try { fout.close(); } catch (IOException ignored) {} }
+            }
+            cleanBitmap.recycle();
+
+            // 步骤2：有贴纸时覆盖保存含贴纸的JPEG到 savePath → 用于内容页显示
+            if (hasStickers) {
+                mImgView.prepareForSaveStickers();
+                Bitmap displayBitmap = mImgView.saveBitmap();
+                if (displayBitmap != null) {
+                    FileOutputStream dfout = null;
+                    try {
+                        dfout = new FileOutputStream(savePath);
+                        displayBitmap.compress(Bitmap.CompressFormat.JPEG, 95, dfout);
+                    } catch (FileNotFoundException e) {
+                        Log.e(TAG, "onDoneClick: compress display failed", e);
+                    } finally {
+                        if (dfout != null) { try { dfout.close(); } catch (IOException ignored) {} }
+                    }
+                    displayBitmap.recycle();
+                }
+            } else {
+                // 无贴纸：clean = display，直接复制
+                try {
+                    java.io.FileInputStream fis = new java.io.FileInputStream(cleanPath);
+                    FileOutputStream fos = new FileOutputStream(savePath);
+                    byte[] buf = new byte[8192]; int n;
+                    while ((n = fis.read(buf)) > 0) fos.write(buf, 0, n);
+                    fis.close(); fos.close();
+                } catch (IOException ignored) {}
+            }
+
+            // 序列化涂鸦 + 贴纸到 JSON
             String doodleJson = mImgView.serializeDoodles();
             try {
                 org.json.JSONObject root = new org.json.JSONObject(doodleJson);
-                if (stickerArr.length() > 0) {
+                if (hasStickers) {
                     root.put("stickers", stickerArr);
                 }
                 doodleJson = root.toString();
             } catch (Exception e) {
                 Log.e(TAG, "onDoneClick: failed to merge stickers", e);
             }
-
-            FileOutputStream fout = null;
-            try {
-                fout = new FileOutputStream(savePath);
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 95, fout);
-            } catch (FileNotFoundException e) {
-                Log.e(TAG, "onDoneClick: compress failed", e);
-            } finally {
-                if (fout != null) {
-                    try { fout.close(); } catch (IOException ignored) {}
-                }
-            }
-            bitmap.recycle();
 
             java.io.FileWriter fw = null;
             try {

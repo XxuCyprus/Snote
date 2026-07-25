@@ -391,11 +391,12 @@ fun ReaderScreen(
                             } else path
                             pendingEditOriginalPath = originalPath
 
-                            // 使用当前文件路径（保留裁切效果），而非原图
-                            val loadPath = if (existingJsonFile.exists() && File(path).name.startsWith("edited_")) {
-                                path  // 已编辑过的文件：加载裁切版本
+                            // 使用干净版图片（无贴纸）进行编辑，避免双重文字框
+                            val cleanPath = path + "_clean.jpg"
+                            val loadPath = if (File(cleanPath).exists()) {
+                                cleanPath  // 有干净版：加载它来编辑
                             } else {
-                                originalPath  // 首次编辑：加载原图
+                                path  // 首次编辑或无贴纸：加载原文件
                             }
 
                             val intent = Intent(context, IMGEditActivity::class.java)
