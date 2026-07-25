@@ -642,7 +642,13 @@ public class IMGImage {
                 // 记录被擦除路径和原始快照中的位置
                 mEraseRemoved.add(path);
                 if (mEraseSnapshot != null) {
-                    mErasePositions.add(mEraseSnapshot.indexOf(path));
+                    int origPos = mEraseSnapshot.indexOf(path);
+                    // 计算offset：之前已移除的、在origPos之前的路径数量
+                    int offset = 0;
+                    for (int j = 0; j < mEraseRemoved.size() - 1; j++) {
+                        if (mErasePositions.get(j) < origPos) offset++;
+                    }
+                    mErasePositions.add(origPos - offset);
                 } else {
                     mErasePositions.add(idx);
                 }
