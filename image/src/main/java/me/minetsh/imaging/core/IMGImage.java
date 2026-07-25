@@ -355,6 +355,12 @@ public class IMGImage {
                 undoArr.put(entry);
             }
             root.put("undo", undoArr);
+            Log.d(TAG, "serializeDoodles: mHistory.size=" + mHistory.size()
+                + ", mUndoOps.size=" + mUndoOps.size()
+                + ", start=" + start
+                + ", undoArr.length=" + undoArr.length()
+                + ", mHistoryIndex=" + mHistoryIndex
+                + ", currentDoodles=" + mDoodles.size());
 
             return root.toString();
         } catch (JSONException e) {
@@ -381,6 +387,7 @@ public class IMGImage {
                 if (root.has("undo")) {
                     JSONArray undoArr = root.getJSONArray("undo");
                     mHistory.add(new ArrayList<IMGPath>());
+                    Log.d(TAG, "deserializeDoodles: undoArr.length=" + undoArr.length() + ", currentDoodles=" + mDoodles.size());
                     for (int i = 0; i < undoArr.length(); i++) {
                         JSONObject entry = undoArr.getJSONObject(i);
                         String type = entry.optString("t", "");
@@ -410,8 +417,20 @@ public class IMGImage {
                         }
                     }
                     mHistoryIndex = mHistory.size() - 1;
+                    // 检查重建的历史最后一项是否与当前涂鸦一致
+                    List<IMGPath> lastHistory = mHistory.get(mHistoryIndex);
+                    boolean matches = lastHistory.size() == mDoodles.size();
+                    if (matches) {
+                        for (int i = 0; i < mDoodles.size(); i++) {
+                            if (lastHistory.get(i) != mDoodles.get(i)) { matches = false; break; }
+                        }
+                    }
                     Log.d(TAG, "deserializeDoodles: rebuilt history, size=" + mHistory.size()
-                        + ", mHistoryIndex=" + mHistoryIndex + ", currentDoodles=" + mDoodles.size());
+                        + ", mHistoryIndex=" + mHistoryIndex
+                        + ", lastHistorySize=" + lastHistory.size()
+                        + ", currentDoodlesSize=" + mDoodles.size()
+                        + ", matches=" + matches);
+                } else if (root.has("history")) {
                 } else if (root.has("history")) {
                     JSONArray histArr = root.getJSONArray("history");
                     for (int i = 0; i < histArr.length(); i++) {
