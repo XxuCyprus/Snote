@@ -371,6 +371,18 @@ class DataRepository @Inject constructor(
         val item = chapter.items.find { it.id == itemId } ?: return@withContext
 
         if (item.type != ContentType.TEXT) {
+            // 检查JSON中是否记录了原图路径，一并删除
+            val jsonFile = File(dataDir, "${item.content}.doodles.json")
+            if (jsonFile.exists()) {
+                try {
+                    val json = org.json.JSONObject(jsonFile.readText())
+                    val originalPath = json.optString("originalPath", "")
+                    if (originalPath.isNotEmpty() && originalPath != item.content) {
+                        fileManager.deleteFile(dataDir, originalPath)
+                    }
+                } catch (_: Exception) {}
+            }
+            // 删除当前文件（及所有伴生文件）
             fileManager.deleteFile(dataDir, item.content)
         }
 
