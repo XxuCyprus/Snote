@@ -14,6 +14,7 @@ import me.minetsh.imaging.core.file.IMGDecoder;
 import me.minetsh.imaging.core.file.IMGFileDecoder;
 import me.minetsh.imaging.core.util.IMGUtils;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -63,6 +64,15 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         }
         if (uri == null) {
             return null;
+        }
+
+        // 如果存在 .base 干净底图，用它来加载（涂鸦通过 JSON 单独恢复）
+        String uriPath = uri.getPath();
+        if (uriPath != null) {
+            File baseFile = new File(uriPath + ".base");
+            if (baseFile.exists() && baseFile.length() > 0) {
+                uri = Uri.fromFile(baseFile);
+            }
         }
 
         IMGDecoder decoder = null;
@@ -170,6 +180,22 @@ public class IMGEditActivity extends IMGEditBaseActivity {
                     }
                 }
                 bitmap.recycle();
+
+                // 生成干净底图（仅图片层，无涂鸦），供二次编辑时撤销/重做
+                Bitmap cleanBitmap = mImgView.saveCleanBitmap();
+                if (cleanBitmap != null) {
+                    try {
+                        File baseFile = new File(path + ".base");
+                        FileOutputStream baseFout = new FileOutputStream(baseFile);
+                        cleanBitmap.compress(Bitmap.CompressFormat.JPEG, 95, baseFout);
+                        baseFout.flush();
+                        baseFout.getFD().sync();
+                        baseFout.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    cleanBitmap.recycle();
+                }
 
                 // 将涂鸦数据放入返回 Intent
                 String doodleJson = mImgView.serializeDoodles();

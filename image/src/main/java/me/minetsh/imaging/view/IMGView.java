@@ -318,6 +318,29 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         return bitmap;
     }
 
+    /**
+     * 只渲染图片层（无涂鸦、无贴纸），用于生成二次编辑的干净底图
+     */
+    public Bitmap saveCleanBitmap() {
+        float scale = 1f / mImage.getScale();
+        RectF frame = new RectF(mImage.getClipFrame());
+        Matrix m = new Matrix();
+        m.setRotate(mImage.getRotate(), frame.centerX(), frame.centerY());
+        m.mapRect(frame);
+        m.setScale(scale, scale, frame.left, frame.top);
+        m.mapRect(frame);
+        Bitmap bitmap = Bitmap.createBitmap(Math.round(frame.width()),
+                Math.round(frame.height()), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        canvas.translate(-frame.left, -frame.top);
+        canvas.scale(scale, scale, frame.left, frame.top);
+        canvas.save();
+        canvas.rotate(mImage.getRotate(), mImage.getClipFrame().centerX(), mImage.getClipFrame().centerY());
+        mImage.onDrawImage(canvas);
+        canvas.restore();
+        return bitmap;
+    }
+
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
