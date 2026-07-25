@@ -330,9 +330,9 @@ public class IMGImage {
             JSONObject root = new JSONObject();
             root.put("doodles", IMGPath.listToJson(mDoodles));
 
-            // 保存全部撤销操作（pushHistory 已限制最多 MAX_HISTORY 条）
+            // 只保存到当前历史位置的撤销操作（不保存被撤销的步骤）
             JSONArray undoArr = new JSONArray();
-            for (int i = 0; i < mUndoOps.size(); i++) {
+            for (int i = 0; i < mHistoryIndex; i++) {
                 UndoOp op = mUndoOps.get(i);
                 JSONObject entry = new JSONObject();
                 if (op == null) {
@@ -358,7 +358,8 @@ public class IMGImage {
                 + ", mUndoOps.size=" + mUndoOps.size()
                 + ", undoArr.length=" + undoArr.length()
                 + ", mHistoryIndex=" + mHistoryIndex
-                + ", currentDoodles=" + mDoodles.size());
+                + ", currentDoodles=" + mDoodles.size()
+                + ", truncated=" + (mUndoOps.size() - mHistoryIndex));
 
             return root.toString();
         } catch (JSONException e) {
