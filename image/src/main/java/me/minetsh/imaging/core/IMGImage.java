@@ -419,7 +419,7 @@ public class IMGImage {
     }
 
     /**
-     * 序列化文字贴纸为 JSON 数组（直接存储 View 坐标，不做任何变换）
+     * 序列化文字贴纸为 JSON 数组（存储图像坐标，确保不同窗口尺寸下位置一致）
      */
     public JSONArray serializeStickers() {
         JSONArray arr = new JSONArray();
@@ -428,10 +428,16 @@ public class IMGImage {
             if (sticker instanceof IMGStickerTextView) {
                 IMGStickerTextView tv = (IMGStickerTextView) sticker;
                 try {
+                    float scale = getScale();
+                    float imgX = (tv.getX() - mFrame.left) / scale;
+                    float imgY = (tv.getY() - mFrame.top) / scale;
+                    float imgW = tv.getWidth() / scale;
+
                     JSONObject obj = new JSONObject();
                     obj.put("text", tv.getText().toJson());
-                    obj.put("x", tv.getX());
-                    obj.put("y", tv.getY());
+                    obj.put("imgX", imgX);
+                    obj.put("imgY", imgY);
+                    obj.put("imgW", imgW);
                     obj.put("scale", tv.getScale());
                     obj.put("rotation", tv.getRotation());
                     arr.put(obj);
@@ -444,7 +450,7 @@ public class IMGImage {
     }
 
     /**
-     * 反序列化文字贴纸（在主线程调用，直接恢复 View 坐标）
+     * 反序列化文字贴纸（在主线程调用，用图像坐标存储，延迟到布局+homing完成后再恢复位置）
      */
     public void deserializeStickers(JSONArray arr, android.content.Context context,
                                      android.widget.FrameLayout parent) {
@@ -454,10 +460,16 @@ public class IMGImage {
             try {
                 JSONObject obj = arr.getJSONObject(i);
                 IMGText text = IMGText.fromJson(obj.getJSONObject("text"));
-                float x = (float) obj.getDouble("x");
-                float y = (float) obj.getDouble("y");
                 float stickerScale = (float) obj.optDouble("scale", 1.0);
                 float rotation = (float) obj.optDouble("rotation", 0.0);
+
+                // 兼容旧格式（View坐标）和新格式（图像坐标）
+                final boolean useImageCoords = obj.has("imgX");
+                final float imgX = (float) obj.optDouble("imgX", 0);
+                final float imgY = (float) obj.optDouble("imgY", 0);
+                final float imgW = (float) obj.optDouble("imgW", 0);
+                final float vx = (float) obj.optDouble("x", 0);
+                final float vy = (float) obj.optDouble("y", 0);
 
                 IMGStickerTextView tv = new IMGStickerTextView(context);
                 tv.setText(text);
@@ -471,20 +483,36 @@ public class IMGImage {
                 tv.registerCallback((IMGSticker.Callback) parent);
                 addSticker(tv);
 
-                // 延迟到布局完成后再设置位置（此时 getPivotX/Y 才正确）
-                final float vx = x;
-                final float vy = y;
                 final float sc = stickerScale;
-                tv.getViewTreeObserver().addOnGlobalLayoutListener(
-                        new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
-                    @Override
-                    public void onGlobalLayout() {
-                        tv.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                        tv.setScale(sc);
-                        tv.setX(vx);
-                        tv.setY(vy);
-                    }
-                });
+                if (useImageCoords) {
+                    // 新格式：延迟到布局+homing完成后再恢复位置
+                    tv.getViewTreeObserver().addOnGlobalLayoutListener(
+                            new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+                        @Override
+                        public void onGlobalLayout() {
+                            tv.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                            tv.setScale(sc);
+                            // 延迟恢复，等homing动画完成
+                            tv.postDelayed(() -> {
+                                float scale = getScale();
+                                tv.setX(imgX * scale + mFrame.left);
+                                tv.setY(imgY * scale + mFrame.top);
+                            }, 500);
+                        }
+                    });
+                } else {
+                    // 旧格式：直接恢复View坐标（兼容）
+                    tv.getViewTreeObserver().addOnGlobalLayoutListener(
+                            new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+                        @Override
+                        public void onGlobalLayout() {
+                            tv.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                            tv.setScale(sc);
+                            tv.setX(vx);
+                            tv.setY(vy);
+                        }
+                    });
+                }
             } catch (JSONException e) {
                 Log.e(TAG, "deserializeStickers failed", e);
             }
@@ -519,6 +547,7 @@ public class IMGImage {
     private boolean mEraseSessionActive = false;
     private List<IMGPath> mEraseRemoved = new ArrayList<>();
     private List<Integer> mErasePositions = new ArrayList<>();
+    private List<IMGPath> mEraseSnapshot = null;
 
     public void eraseBegin() {
         if (mEraseSessionActive) return;
@@ -527,6 +556,7 @@ public class IMGImage {
         mErasePositions.clear();
         // 擦除开始前保存快照
         pushHistory();
+        mEraseSnapshot = new ArrayList<>(mDoodles);
     }
 
     public void eraseEnd() {
@@ -537,11 +567,12 @@ public class IMGImage {
                 mUndoOps.set(idx, new UndoOp(
                         new ArrayList<>(mEraseRemoved),
                         new ArrayList<>(mErasePositions),
-                        mHistory.get(idx)
+                        mEraseSnapshot
                 ));
             }
         }
         mEraseSessionActive = false;
+        mEraseSnapshot = null;
         // 擦除结束，标记缓存失效，下一帧重建
         invalidateDoodlesCache();
     }
@@ -597,9 +628,13 @@ public class IMGImage {
             if (parts.size() == 1 && parts.get(0) == path) {
                 newDoodles.add(path);
             } else {
-                // 记录被擦除的原始路径和位置
+                // 记录被擦除路径和原始快照中的位置
                 mEraseRemoved.add(path);
-                mErasePositions.add(idx);
+                if (mEraseSnapshot != null) {
+                    mErasePositions.add(mEraseSnapshot.indexOf(path));
+                } else {
+                    mErasePositions.add(idx);
+                }
                 newDoodles.addAll(parts);
             }
         }

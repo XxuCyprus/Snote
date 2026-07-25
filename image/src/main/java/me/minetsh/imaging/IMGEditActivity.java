@@ -244,7 +244,10 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         options.inJustDecodeBounds = false;
 
         Bitmap bitmap = decoder.decode(options);
-        Log.d(TAG, "getBitmap: bitmap=" + (bitmap == null ? "null" : bitmap.getWidth() + "x" + bitmap.getHeight() + " config=" + bitmap.getConfig()));
+        Log.d(TAG, "LOAD: bitmap=" + (bitmap == null ? "null" : bitmap.getWidth() + "x" + bitmap.getHeight() + " config=" + bitmap.getConfig())
+            + ", path=" + path
+            + ", file=" + imgFile.getName()
+            + ", fileSize=" + (imgFile.exists() ? imgFile.length() : 0));
         if (bitmap != null) {
             int pixel = bitmap.getPixel(bitmap.getWidth() / 2, bitmap.getHeight() / 2);
             Log.d(TAG, "getBitmap: center pixel color=#" + Integer.toHexString(pixel) + " (isBlack=" + (pixel == Color.BLACK) + ")");
@@ -336,6 +339,8 @@ public class IMGEditActivity extends IMGEditBaseActivity {
             }
 
             String cleanPath = savePath + "_clean.jpg";
+            Log.d(TAG, "SAVE: cleanBitmap=" + cleanBitmap.getWidth() + "x" + cleanBitmap.getHeight()
+                + ", cleanPath=" + cleanPath);
             FileOutputStream fout = null;
             try {
                 fout = new FileOutputStream(cleanPath);
@@ -350,6 +355,8 @@ public class IMGEditActivity extends IMGEditBaseActivity {
             // 步骤2：保存含涂鸦+贴纸的JPEG到 savePath → 内容页显示用
             // 涂鸦+贴纸从JSON恢复，不再烘焙到 _clean.jpg
             Bitmap displayBitmap = mImgView.saveBitmap();
+            Log.d(TAG, "SAVE: displayBitmap=" + (displayBitmap != null ? displayBitmap.getWidth() + "x" + displayBitmap.getHeight() : "null")
+                + ", savePath=" + savePath);
             if (displayBitmap != null) {
                 FileOutputStream dfout = null;
                 try {
