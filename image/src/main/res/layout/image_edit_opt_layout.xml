@@ -147,7 +147,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:max="48"
-            android:min="2"
+            android:min="10"
             android:progress="20" />
 
     </LinearLayout>

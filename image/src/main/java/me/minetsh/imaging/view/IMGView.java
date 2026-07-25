@@ -423,7 +423,10 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
 
     private boolean onPathBegin(MotionEvent event) {
         mPen.reset(event.getX(), event.getY());
+        // 单击描点：用两个相同坐标点形成一个点
+        mPen.lineTo(event.getX(), event.getY());
         mPen.setIdentity(event.getPointerId(0));
+        invalidate();
         return true;
     }
 

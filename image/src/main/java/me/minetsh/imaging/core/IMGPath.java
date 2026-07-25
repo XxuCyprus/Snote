@@ -95,20 +95,23 @@ public class IMGPath {
 
     /**
      * 擦除路径中靠近 (x, y) 的部分，返回剩余的路径段列表
+     * 如果没有擦除任何内容，返回包含原始路径的单元素列表
      */
     public List<IMGPath> eraseNear(float x, float y, float radius) {
         List<IMGPath> result = new ArrayList<>();
         float[] points = approximatePathPoints();
         if (points.length < 4) return result;
 
-        // 标记每个线段是否在擦除区域内
+        // 标记每个点是否在擦除区域内
         boolean[] inside = new boolean[points.length / 2];
+        boolean anyInside = false;
         int i = 0;
         for (; i < points.length; i += 2) {
             float dx = points[i] - x;
             float dy = points[i + 1] - y;
             if (dx * dx + dy * dy <= radius * radius) {
                 inside[i / 2] = true;
+                anyInside = true;
             }
         }
 
@@ -119,10 +122,17 @@ public class IMGPath {
             if (d <= radius) {
                 inside[i / 2] = true;
                 inside[i / 2 + 1] = true;
+                anyInside = true;
             }
         }
 
-        // 拆分路径
+        // 没有任何点被擦除 → 返回原始路径，不做任何重建
+        if (!anyInside) {
+            result.add(this);
+            return result;
+        }
+
+        // 拆分路径（用采样点重建）
         Path currentSeg = new Path();
         boolean started = false;
         for (i = 0; i < points.length; i += 2) {
