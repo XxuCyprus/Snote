@@ -16,10 +16,13 @@ import me.minetsh.imaging.core.util.IMGUtils;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Created by felix on 2017/11/14 下午2:26.
@@ -64,7 +67,8 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         if (!jsonFile.exists()) return null;
         try {
             StringBuilder sb = new StringBuilder();
-            BufferedReader reader = new BufferedReader(new FileReader(jsonFile));
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(new FileInputStream(jsonFile), StandardCharsets.UTF_8));
             String line;
             while ((line = reader.readLine()) != null) {
                 sb.append(line);
@@ -216,8 +220,12 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         try {
             File jsonFile = new File(imagePath + ".doodles.json");
             FileOutputStream fos = new FileOutputStream(jsonFile);
-            fos.write(json.getBytes());
-            fos.close();
+            OutputStreamWriter writer = new OutputStreamWriter(fos, StandardCharsets.UTF_8);
+            writer.write(json);
+            writer.flush();
+            // 强制同步到磁盘，确保 finish() 前文件已完整写入
+            fos.getFD().sync();
+            writer.close();
         } catch (IOException e) {
             e.printStackTrace();
         }

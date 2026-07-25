@@ -272,7 +272,7 @@ public class IMGImage {
             return root.toString();
         } catch (JSONException e) {
             Log.e(TAG, "serializeDoodles failed", e);
-            return null;
+            return "{}";
         }
     }
 
