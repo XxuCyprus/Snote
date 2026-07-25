@@ -40,12 +40,16 @@ public class IMGEditActivity extends IMGEditBaseActivity {
 
     private static final String TAG = "IMGEdit";
 
-    private android.app.AlertDialog createThemedDialog() {
+    private android.widget.TextView mDialogText;
+    private android.app.AlertDialog mCurrentDialog;
+
+    private void showLoadingDialog(String message) {
+        dismissLoadingDialog();
+
         android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
         bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
         bg.setCornerRadius(16 * getResources().getDisplayMetrics().density);
         bg.setColor(0xFFFFFFFF);
-        bg.setStroke((int) (1 * getResources().getDisplayMetrics().density), 0xFFE0E0E0);
 
         android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
         layout.setOrientation(android.widget.LinearLayout.VERTICAL);
@@ -64,18 +68,30 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         progress.setLayoutParams(pp);
         layout.addView(progress);
 
-        android.widget.TextView text = new android.widget.TextView(this);
-        text.setGravity(android.view.Gravity.CENTER);
-        text.setTextColor(0xFF212121);  // 深黑色，确保在白底可见
-        text.setTextSize(16);
-        text.setPadding(0, (int) (20 * getResources().getDisplayMetrics().density), 0, 0);
-        text.setId(android.R.id.text1);
-        layout.addView(text);
+        mDialogText = new android.widget.TextView(this);
+        mDialogText.setText(message);
+        mDialogText.setGravity(android.view.Gravity.CENTER);
+        mDialogText.setTextColor(0xFF212121);
+        mDialogText.setTextSize(16);
+        mDialogText.setPadding(0, (int) (20 * getResources().getDisplayMetrics().density), 0, 0);
+        layout.addView(mDialogText);
 
-        return new android.app.AlertDialog.Builder(this)
+        mCurrentDialog = new android.app.AlertDialog.Builder(this)
                 .setView(layout)
                 .setCancelable(false)
                 .create();
+        mCurrentDialog.show();
+    }
+
+    private void updateDialogText(String text) {
+        if (mDialogText != null) {
+            mDialogText.setText(text);
+        }
+    }
+
+    private void dismissLoadingDialog() {
+        mCurrentDialog = null;
+        mDialogText = null;
     }
 
     @Override
@@ -83,79 +99,77 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         String doodleFilePath = getIntent().getStringExtra(EXTRA_DOODLE_FILE_PATH);
         String doodleJsonFromIntent = getIntent().getStringExtra(EXTRA_DOODLE_JSON);
 
-        if (doodleFilePath != null || doodleJsonFromIntent != null) {
-            android.app.AlertDialog loadDialog = createThemedDialog();
-            android.widget.TextView tv = (android.widget.TextView) loadDialog.findViewById(android.R.id.text1);
-            if (tv != null) tv.setText("正在恢复编辑记录...");
-            loadDialog.show();
+        if (doodleFilePath == null && doodleJsonFromIntent == null) return;
 
-            final String filePath = doodleFilePath;
-            final String jsonFallback = doodleJsonFromIntent;
-            final long showTime = System.currentTimeMillis();
+        showLoadingDialog("正在恢复编辑记录...");
 
-            new Thread(() -> {
-                String doodleJson = null;
-                int undoCount = 0;
+        final String filePath = doodleFilePath;
+        final String jsonFallback = doodleJsonFromIntent;
+        final long showTime = System.currentTimeMillis();
 
-                if (filePath != null) {
-                    java.io.File doodleFile = new java.io.File(filePath);
-                    if (doodleFile.exists()) {
-                        try {
-                            byte[] bytes = new byte[(int) doodleFile.length()];
-                            java.io.FileInputStream fis = new java.io.FileInputStream(doodleFile);
-                            fis.read(bytes);
-                            fis.close();
-                            doodleJson = new String(bytes, "UTF-8");
-                        } catch (IOException e) {
-                            Log.e(TAG, "onCreated: failed to read doodle file", e);
-                        }
-                    }
-                }
-                if (doodleJson == null) {
-                    doodleJson = jsonFallback;
-                }
+        new Thread(() -> {
+            String doodleJson = null;
+            int undoCount = 0;
 
-                if (doodleJson != null && !doodleJson.isEmpty()) {
+            if (filePath != null) {
+                java.io.File doodleFile = new java.io.File(filePath);
+                if (doodleFile.exists()) {
                     try {
-                        org.json.JSONObject root = new org.json.JSONObject(doodleJson);
-                        if (root.has("undo")) {
-                            undoCount = root.getJSONArray("undo").length();
-                        } else if (root.has("history")) {
-                            undoCount = root.getJSONArray("history").length();
-                        }
-                    } catch (Exception ignored) {}
+                        byte[] bytes = new byte[(int) doodleFile.length()];
+                        java.io.FileInputStream fis = new java.io.FileInputStream(doodleFile);
+                        fis.read(bytes);
+                        fis.close();
+                        doodleJson = new String(bytes, "UTF-8");
+                    } catch (IOException e) {
+                        Log.e(TAG, "onCreated: failed to read doodle file", e);
+                    }
                 }
+            }
+            if (doodleJson == null) {
+                doodleJson = jsonFallback;
+            }
 
-                final String json = doodleJson;
-                final int count = undoCount;
-
-                // 文件读取在后台，但反序列化必须在主线程（避免与 onDraw 并发）
-                // JSON 解析（14000+ 路径点重建）仍较重，但这是唯一安全的方式
-                runOnUiThread(() -> {
-                    if (json != null && !json.isEmpty()) {
-                        mImgView.deserializeDoodles(json);
-                        if (!mImgView.isDoodleEmpty()) {
-                            mImgView.post(() -> {
-                                mImgView.setMode(IMGMode.DOODLE);
-                                updateModeUI();
-                            });
-                        }
+            if (doodleJson != null && !doodleJson.isEmpty()) {
+                try {
+                    org.json.JSONObject root = new org.json.JSONObject(doodleJson);
+                    if (root.has("undo")) {
+                        undoCount = root.getJSONArray("undo").length();
+                    } else if (root.has("history")) {
+                        undoCount = root.getJSONArray("history").length();
                     }
-                    tv.setText("已恢复 " + count + " 条编辑记录");
+                } catch (Exception ignored) {}
+            }
 
-                    long elapsed = System.currentTimeMillis() - showTime;
-                    long remaining = 2000 - elapsed;
-                    if (remaining > 0) {
-                        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                            loadDialog.dismiss();
-                        }, remaining);
-                    } else {
-                        loadDialog.dismiss();
+            final String json = doodleJson;
+            final int count = undoCount;
+
+            runOnUiThread(() -> {
+                if (json != null && !json.isEmpty()) {
+                    mImgView.deserializeDoodles(json);
+                    if (!mImgView.isDoodleEmpty()) {
+                        mImgView.post(() -> {
+                            mImgView.setMode(IMGMode.DOODLE);
+                            updateModeUI();
+                        });
                     }
-                });
-            }).start();
-        }
+                }
+                updateDialogText("已恢复 " + count + " 条编辑记录");
+
+                long elapsed = System.currentTimeMillis() - showTime;
+                long remaining = 2000 - elapsed;
+                if (remaining > 0) {
+                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                        if (mCurrentDialog != null) mCurrentDialog.dismiss();
+                        dismissLoadingDialog();
+                    }, remaining);
+                } else {
+                    if (mCurrentDialog != null) mCurrentDialog.dismiss();
+                    dismissLoadingDialog();
+                }
+            });
+        }).start();
     }
+
 
     @Override
     public Bitmap getBitmap() {
@@ -286,32 +300,25 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         // 停止所有动画和回调，防止后台读取冲突
         mImgView.prepareForSave();
 
-        // 主题对话���
-        android.app.AlertDialog dialog = createThemedDialog();
-        android.widget.TextView tv = (android.widget.TextView) dialog.findViewById(android.R.id.text1);
-        if (tv != null) tv.setText("正在保存...");
-        dialog.show();
+        showLoadingDialog("正在保存...");
         final long showTime = System.currentTimeMillis();
 
-        // 全部重活移到后台线程：saveBitmap + serializeDoodles + JPEG压缩 + 文件写入
         final String savePath = path;
         final String jsonPath = path + ".doodles.json";
         new Thread(() -> {
-            // 渲染位图
             Bitmap bitmap = mImgView.saveBitmap();
             if (bitmap == null) {
                 runOnUiThread(() -> {
-                    dialog.dismiss();
+                    if (mCurrentDialog != null) mCurrentDialog.dismiss();
+                    dismissLoadingDialog();
                     setResult(RESULT_CANCELED);
                     finish();
                 });
                 return;
             }
 
-            // 序列化涂鸦 JSON
             String doodleJson = mImgView.serializeDoodles();
 
-            // JPEG 压缩
             FileOutputStream fout = null;
             try {
                 fout = new FileOutputStream(savePath);
@@ -325,7 +332,6 @@ public class IMGEditActivity extends IMGEditBaseActivity {
             }
             bitmap.recycle();
 
-            // 写入涂鸦 JSON
             java.io.FileWriter fw = null;
             try {
                 fw = new java.io.FileWriter(jsonPath);
@@ -338,7 +344,6 @@ public class IMGEditActivity extends IMGEditBaseActivity {
                 }
             }
 
-            // 最低显示 3 秒
             long elapsed = System.currentTimeMillis() - showTime;
             long remaining = 3000 - elapsed;
             if (remaining > 0) {
@@ -346,7 +351,8 @@ public class IMGEditActivity extends IMGEditBaseActivity {
             }
 
             runOnUiThread(() -> {
-                dialog.dismiss();
+                if (mCurrentDialog != null) mCurrentDialog.dismiss();
+                dismissLoadingDialog();
                 Intent resultIntent = new Intent();
                 resultIntent.putExtra(EXTRA_DOODLE_FILE_PATH, jsonPath);
                 setResult(RESULT_OK, resultIntent);
