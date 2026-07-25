@@ -405,12 +405,23 @@ class DataRepository @Inject constructor(
         val chapter = findChapterInNotebook(notebookId, chapterId) ?: return@withContext
         val idx = chapter.items.indexOfFirst { it.id == itemId }
         if (idx >= 0) {
+            // 记录旧路径，用于删除旧文件
+            val oldPath = chapter.items[idx].content
             withNotebook(notebookId) { nb ->
                 nb.withChapter(chapterId) { ch ->
                     ch.copy(items = ch.items.map { if (it.id == itemId) it.copy(content = newPath) else it })
                 }
             }
             save()
+            // 删除旧的原始照片文件（如果路径不同）
+            if (oldPath != newPath) {
+                val oldFile = File(dataDir, oldPath)
+                if (oldFile.exists()) {
+                    oldFile.delete()
+                }
+                // 清理旧文件的伴生文件
+                File(dataDir, "$oldPath.doodles.json").let { if (it.exists()) it.delete() }
+            }
         }
     }
 

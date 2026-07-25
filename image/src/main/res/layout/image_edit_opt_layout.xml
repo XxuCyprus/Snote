@@ -26,18 +26,48 @@
             android:textColor="@color/image_color_primary"
             android:textSize="16sp" />
 
-        <TextView
-            android:id="@+id/tv_done"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="top|end"
             android:layout_marginTop="8dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:onClick="onClick"
-            android:text="@string/image_done"
-            android:textColor="@color/image_color_accent"
-            android:textSize="16sp" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/btn_undo"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@null"
+                android:contentDescription="@string/image_undo"
+                android:onClick="onClick"
+                android:src="@drawable/image_btn_undo" />
+
+            <ImageButton
+                android:id="@+id/btn_redo"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginLeft="8dp"
+                android:background="@null"
+                android:contentDescription="前进"
+                android:onClick="onClick"
+                android:src="@drawable/image_btn_undo" />
+
+            <TextView
+                android:id="@+id/tv_done"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_marginLeft="12dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:onClick="onClick"
+                android:text="@string/image_done"
+                android:textColor="@color/image_color_accent"
+                android:textSize="16sp" />
+
+        </LinearLayout>
 
     </FrameLayout>
 
@@ -129,15 +159,6 @@
                 android:contentDescription="橡皮擦"
                 android:onClick="onClick"
                 android:src="@drawable/image_btn_eraser" />
-
-            <ImageButton
-                android:id="@+id/btn_undo"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@null"
-                android:contentDescription="@string/image_undo"
-                android:onClick="onClick"
-                android:src="@drawable/image_btn_undo" />
 
         </LinearLayout>
 

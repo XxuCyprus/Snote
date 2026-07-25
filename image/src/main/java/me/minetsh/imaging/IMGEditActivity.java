@@ -14,8 +14,11 @@ import me.minetsh.imaging.core.file.IMGDecoder;
 import me.minetsh.imaging.core.file.IMGFileDecoder;
 import me.minetsh.imaging.core.util.IMGUtils;
 
+import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 
 /**
@@ -34,7 +37,31 @@ public class IMGEditActivity extends IMGEditBaseActivity {
 
     @Override
     public void onCreated() {
+        // 尝试加载已有的涂鸦数据（重新编辑时恢复撤销/重做历史）
+        String savePath = getIntent().getStringExtra(EXTRA_IMAGE_SAVE_PATH);
+        if (savePath != null) {
+            String doodleJson = loadDoodleJson(savePath);
+            if (doodleJson != null) {
+                mImgView.deserializeDoodles(doodleJson);
+            }
+        }
+    }
 
+    private String loadDoodleJson(String imagePath) {
+        File jsonFile = new File(imagePath + ".doodles.json");
+        if (!jsonFile.exists()) return null;
+        try {
+            StringBuilder sb = new StringBuilder();
+            BufferedReader reader = new BufferedReader(new FileReader(jsonFile));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+            reader.close();
+            return sb.toString();
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     @Override
@@ -125,6 +152,14 @@ public class IMGEditActivity extends IMGEditBaseActivity {
     }
 
     @Override
+    public void onRedoClick() {
+        IMGMode mode = mImgView.getMode();
+        if (mode == IMGMode.DOODLE) {
+            mImgView.redoDoodle();
+        }
+    }
+
+    @Override
     public void onCancelClick() {
         finish();
     }
@@ -150,6 +185,10 @@ public class IMGEditActivity extends IMGEditBaseActivity {
                         }
                     }
                 }
+
+                // 保存涂鸦数据（用于重新编辑时恢复撤销/重做）
+                saveDoodleJson(path);
+
                 setResult(RESULT_OK);
                 finish();
                 return;
@@ -157,6 +196,19 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         }
         setResult(RESULT_CANCELED);
         finish();
+    }
+
+    private void saveDoodleJson(String imagePath) {
+        String json = mImgView.serializeDoodles();
+        if (json == null) return;
+        try {
+            File jsonFile = new File(imagePath + ".doodles.json");
+            FileOutputStream fos = new FileOutputStream(jsonFile);
+            fos.write(json.getBytes());
+            fos.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override

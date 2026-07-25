@@ -10,6 +10,10 @@ import android.graphics.PointF;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 /**
  * Created by felix on 2017/11/22 下午6:13.
  */
@@ -196,5 +200,68 @@ public class IMGPath {
         float cy = ay + t * dy;
         float d = (px - cx) * (px - cx) + (py - cy) * (py - cy);
         return (float) Math.sqrt(d);
+    }
+
+    /**
+     * 序列化为 JSON
+     */
+    public JSONObject toJson() throws JSONException {
+        JSONObject obj = new JSONObject();
+        obj.put("color", color);
+        obj.put("width", (double) width);
+
+        // 用 PathMeasure 提取路径点
+        float[] pts = approximatePathPoints();
+        JSONArray arr = new JSONArray();
+        for (int i = 0; i < pts.length; i += 2) {
+            JSONArray pt = new JSONArray();
+            pt.put((double) pts[i]);
+            pt.put((double) pts[i + 1]);
+            arr.put(pt);
+        }
+        obj.put("points", arr);
+        return obj;
+    }
+
+    /**
+     * 从 JSON 反序列化
+     */
+    public static IMGPath fromJson(JSONObject obj) throws JSONException {
+        int color = obj.getInt("color");
+        float width = (float) obj.getDouble("width");
+
+        JSONArray arr = obj.getJSONArray("points");
+        Path path = new Path();
+        if (arr.length() > 0) {
+            JSONArray first = arr.getJSONArray(0);
+            path.moveTo((float) first.getDouble(0), (float) first.getDouble(1));
+            for (int i = 1; i < arr.length(); i++) {
+                JSONArray pt = arr.getJSONArray(i);
+                path.lineTo((float) pt.getDouble(0), (float) pt.getDouble(1));
+            }
+        }
+        return new IMGPath(path, IMGMode.DOODLE, color, width);
+    }
+
+    /**
+     * 批量序列化
+     */
+    public static JSONArray listToJson(List<IMGPath> paths) throws JSONException {
+        JSONArray arr = new JSONArray();
+        for (IMGPath p : paths) {
+            arr.put(p.toJson());
+        }
+        return arr;
+    }
+
+    /**
+     * 批量反序列化
+     */
+    public static List<IMGPath> listFromJson(JSONArray arr) throws JSONException {
+        List<IMGPath> result = new ArrayList<>();
+        for (int i = 0; i < arr.length(); i++) {
+            result.add(fromJson(arr.getJSONObject(i)));
+        }
+        return result;
     }
 }

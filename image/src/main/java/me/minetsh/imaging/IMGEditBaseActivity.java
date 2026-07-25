@@ -110,6 +110,8 @@ abstract class IMGEditBaseActivity extends Activity implements View.OnClickListe
             onModeClick(IMGMode.CLIP);
         } else if (vid == R.id.btn_undo) {
             onUndoClick();
+        } else if (vid == R.id.btn_redo) {
+            onRedoClick();
         } else if (vid == R.id.btn_eraser) {
             onEraserClick();
         } else if (vid == R.id.tv_done) {
@@ -203,6 +205,8 @@ abstract class IMGEditBaseActivity extends Activity implements View.OnClickListe
     public abstract void onModeClick(IMGMode mode);
 
     public abstract void onUndoClick();
+
+    public abstract void onRedoClick();
 
     public abstract void onCancelClick();
 

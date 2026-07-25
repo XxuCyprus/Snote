@@ -19,6 +19,10 @@ import me.minetsh.imaging.core.util.IMGUtils;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 /**
  * Created by felix on 2017/11/21 下午10:03.
  */
@@ -106,6 +110,11 @@ public class IMGImage {
      * 撤销栈（用于橡皮擦操作的整笔恢复）
      */
     private List<List<IMGPath>> mUndoStack = new ArrayList<>();
+
+    /**
+     * 重做栈
+     */
+    private List<List<IMGPath>> mRedoStack = new ArrayList<>();
 
     private static final int MIN_SIZE = 500;
 
@@ -220,9 +229,80 @@ public class IMGImage {
     public void undoDoodle() {
         // 优先从撤销栈恢复（橡皮擦操作）
         if (!mUndoStack.isEmpty()) {
+            mRedoStack.add(new ArrayList<>(mDoodles));
             mDoodles = mUndoStack.remove(mUndoStack.size() - 1);
         } else if (!mDoodles.isEmpty()) {
+            // 保存当前状态到重做栈，然后移除最后一笔
+            mRedoStack.add(new ArrayList<>(mDoodles));
             mDoodles.remove(mDoodles.size() - 1);
+        }
+    }
+
+    public void redoDoodle() {
+        if (!mRedoStack.isEmpty()) {
+            mUndoStack.add(new ArrayList<>(mDoodles));
+            mDoodles = mRedoStack.remove(mRedoStack.size() - 1);
+        }
+    }
+
+    public boolean canRedo() {
+        return !mRedoStack.isEmpty();
+    }
+
+    /**
+     * 将涂鸦状态序列化为 JSON（用于保存后重新编辑）
+     */
+    public String serializeDoodles() {
+        try {
+            JSONObject root = new JSONObject();
+            root.put("doodles", IMGPath.listToJson(mDoodles));
+
+            JSONArray undoArr = new JSONArray();
+            for (List<IMGPath> snapshot : mUndoStack) {
+                undoArr.put(IMGPath.listToJson(snapshot));
+            }
+            root.put("undoStack", undoArr);
+
+            JSONArray redoArr = new JSONArray();
+            for (List<IMGPath> snapshot : mRedoStack) {
+                redoArr.put(IMGPath.listToJson(snapshot));
+            }
+            root.put("redoStack", redoArr);
+
+            return root.toString();
+        } catch (JSONException e) {
+            Log.e(TAG, "serializeDoodles failed", e);
+            return null;
+        }
+    }
+
+    /**
+     * 从 JSON 反序列化涂鸦状态
+     */
+    public void deserializeDoodles(String json) {
+        if (json == null) return;
+        try {
+            JSONObject root = new JSONObject(json);
+
+            mDoodles = IMGPath.listFromJson(root.getJSONArray("doodles"));
+
+            mUndoStack.clear();
+            if (root.has("undoStack")) {
+                JSONArray undoArr = root.getJSONArray("undoStack");
+                for (int i = 0; i < undoArr.length(); i++) {
+                    mUndoStack.add(IMGPath.listFromJson(undoArr.getJSONArray(i)));
+                }
+            }
+
+            mRedoStack.clear();
+            if (root.has("redoStack")) {
+                JSONArray redoArr = root.getJSONArray("redoStack");
+                for (int i = 0; i < redoArr.length(); i++) {
+                    mRedoStack.add(IMGPath.listFromJson(redoArr.getJSONArray(i)));
+                }
+            }
+        } catch (JSONException e) {
+            Log.e(TAG, "deserializeDoodles failed", e);
         }
     }
 
@@ -231,6 +311,7 @@ public class IMGImage {
      */
     public void eraseBegin() {
         mUndoStack.add(new ArrayList<>(mDoodles));
+        mRedoStack.clear();
     }
 
     /**
@@ -389,9 +470,13 @@ public class IMGImage {
         M.postScale(scale, scale);
         path.transform(M);
 
+        // 宽度也做缩放，确保不同尺寸照片下屏幕显示一致
+        path.setWidth(path.getWidth() * scale);
+
         switch (path.getMode()) {
             case DOODLE:
                 mDoodles.add(path);
+                mRedoStack.clear();
                 break;
         }
     }
