@@ -379,25 +379,27 @@ fun ReaderScreen(
                             pendingEditSavePath = saveFile.absolutePath
                             pendingEditItemId = itemId
 
-                            // 查找原图路径：从已有涂鸦 JSON 中获取，首次编辑则为当前路径
+                            // 加载当前文件（可能是原图或已编辑的裁切版本）
+                            // 已有编辑记录时加载当前文件来保留裁切效果
                             val existingJsonFile = File("$path.doodles.json")
                             val originalPath: String = if (existingJsonFile.exists()) {
                                 try {
                                     val json = org.json.JSONObject(existingJsonFile.readText())
                                     val op = json.optString("originalPath", "")
-                                    android.util.Log.d("IMGEdit", "onImageEdit: JSON originalPath=$op")
                                     if (op.isNotEmpty()) op else path
-                                } catch (e: Exception) {
-                                    android.util.Log.e("IMGEdit", "onImageEdit: JSON parse error", e)
-                                    path
-                                }
+                                } catch (e: Exception) { path }
                             } else path
-                            android.util.Log.d("IMGEdit", "onImageEdit: final originalPath=$originalPath")
-                            android.util.Log.d("IMGEdit", "onImageEdit: originalFile exists=${java.io.File(originalPath).exists()}")
                             pendingEditOriginalPath = originalPath
 
+                            // 使用当前文件路径（保留裁切效果），而非原图
+                            val loadPath = if (existingJsonFile.exists() && File(path).name.startsWith("edited_")) {
+                                path  // 已编辑过的文件：加载裁切版本
+                            } else {
+                                originalPath  // 首次编辑：加载原图
+                            }
+
                             val intent = Intent(context, IMGEditActivity::class.java)
-                                .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, Uri.fromFile(File(originalPath)))
+                                .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, Uri.fromFile(File(loadPath)))
                                 .putExtra(IMGEditActivity.EXTRA_IMAGE_SAVE_PATH, saveFile.absolutePath)
                             // 加载已有涂鸦数据（通过文件路径避免 TransactionTooLargeException）
                             if (existingJsonFile.exists()) {

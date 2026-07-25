@@ -145,8 +145,13 @@ public class IMGEditActivity extends IMGEditBaseActivity {
 
             runOnUiThread(() -> {
                 if (json != null && !json.isEmpty()) {
-                    mImgView.deserializeDoodles(json);
-                    // 恢复文字贴纸（坐标已存储为Bitmap空间，不受裁切影响）
+                    // 如果是编辑过的文件（已有裁切），JPEG中已包含涂鸦，不需要恢复
+                    String uriPath = getIntent().getStringExtra(EXTRA_IMAGE_URI);
+                    boolean isEdited = uriPath != null && new java.io.File(uriPath).getName().startsWith("edited_");
+                    if (!isEdited) {
+                        mImgView.deserializeDoodles(json);
+                    }
+                    // 恢复文字贴纸（View坐标直接复原）
                     try {
                         org.json.JSONObject root = new org.json.JSONObject(json);
                         if (root.has("stickers")) {
