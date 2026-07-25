@@ -26,3 +26,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Snote"
 include(":app")
+include(":image")

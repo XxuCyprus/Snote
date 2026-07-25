@@ -50,5 +50,11 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- 图片编辑器 Activity -->
+        <activity
+            android:name="me.minetsh.imaging.IMGEditActivity"
+            android:theme="@style/ImageEditTheme"
+            android:windowSoftInputMode="stateAlwaysHidden" />
+
     </application>
 </manifest>

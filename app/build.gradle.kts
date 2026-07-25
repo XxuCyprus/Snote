@@ -103,4 +103,7 @@ dependencies {
     // ========== 数据存储 ==========
     // DataStore - 用于存储简单的键值对数据（如设置项）
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // ========== Imaging 图片编辑库 ==========
+    implementation(project(":image"))
 }

@@ -69,6 +69,8 @@ import com.snote.app.data.model.Chapter
 import com.snote.app.data.model.ContentItem
 import com.snote.app.data.model.ContentType
 import java.io.File
+import java.util.UUID
+import me.minetsh.imaging.IMGEditActivity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,9 +106,24 @@ fun ReaderScreen(
     // 文字编辑状态
     var editingTextItem by remember { mutableStateOf<ContentItem?>(null) }
 
-    // 图片编辑状态
-    var editingImagePath by remember { mutableStateOf<String?>(null) }
-    var editingImageItemId by remember { mutableStateOf<String?>(null) }
+    // 图片编辑器 Activity 启动器
+    var pendingEditSavePath by remember { mutableStateOf<String?>(null) }
+    var pendingEditItemId by remember { mutableStateOf<String?>(null) }
+    val imageEditLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val savedPath = pendingEditSavePath
+            val itemId = pendingEditItemId
+            if (savedPath != null && itemId != null) {
+                val dataDirPath = viewModel.getAbsolutePath("")
+                val relativePath = savedPath.removePrefix("$dataDirPath/")
+                viewModel.updateImageContent(itemId, relativePath)
+            }
+        }
+        pendingEditSavePath = null
+        pendingEditItemId = null
+    }
 
     // 章节重命名状态
     var renamingChapterId by remember { mutableStateOf<String?>(null) }
@@ -145,32 +162,6 @@ fun ReaderScreen(
             editTextAnimProgress.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 350f))
         } else {
             editTextAnimProgress.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 500f))
-        }
-    }
-
-    // 图片编辑器动画进度 — 中央弹簧弹入/弹出
-    val imageEditAnimProgress = remember { Animatable(0f) }
-    LaunchedEffect(editingImagePath) {
-        if (editingImagePath != null) {
-            imageEditAnimProgress.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = 450f))
-        } else {
-            imageEditAnimProgress.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 350f))
-        }
-    }
-
-    // 图片编辑器持久化路径 — 退出动画期间保持不为 null（防 NPE 闪退）
-    var imageEditPath by remember { mutableStateOf<String?>(null) }
-    var imageEditItemId by remember { mutableStateOf<String?>(null) }
-    if (editingImagePath != null) {
-        imageEditPath = editingImagePath
-        imageEditItemId = editingImageItemId
-    }
-    LaunchedEffect(editingImagePath) {
-        if (editingImagePath == null && imageEditPath != null) {
-            snapshotFlow { imageEditAnimProgress.value }
-                .first { it <= 0.01f }
-            imageEditPath = null
-            imageEditItemId = null
         }
     }
 
@@ -370,8 +361,13 @@ fun ReaderScreen(
                         onImageClick = { path -> fullscreenImagePath = path },
                         onVideoClick = { path -> videoTargetPath = path },
                         onImageEdit = { path, itemId ->
-                            editingImagePath = path
-                            editingImageItemId = itemId
+                            val saveFile = File(context.cacheDir, "edited_${UUID.randomUUID()}.jpg")
+                            pendingEditSavePath = saveFile.absolutePath
+                            pendingEditItemId = itemId
+                            val intent = Intent(context, IMGEditActivity::class.java)
+                                .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, Uri.fromFile(File(path)))
+                                .putExtra(IMGEditActivity.EXTRA_IMAGE_SAVE_PATH, saveFile.absolutePath)
+                            imageEditLauncher.launch(intent)
                         },
                         onSaveToGallery = { path ->
                             val file = File(path)
@@ -802,62 +798,6 @@ fun ReaderScreen(
                             editingTextItem = null
                         }
                     )
-                }
-            }
-        }
-    }
-
-    // 图片编辑弹窗 — graphicsLayer 动画覆盖层
-    val iev = imageEditAnimProgress.value
-    if (imageEditPath != null || iev > 0.01f) {
-        Box(Modifier.fillMaxSize()) {
-            // scrim
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { alpha = iev * 0.5f }
-                    .background(Color.Black)
-                    .clickable(
-                        indication = null,
-                        interactionSource = remember { MutableInteractionSource() },
-                        onClick = {}
-                    )
-            )
-            // 卡片层 — 中央 scale + fade
-            Box(
-                Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    Modifier.graphicsLayer {
-                        clip = true
-                        alpha = iev
-                        val s = 0.08f + 0.92f * iev
-                        scaleX = s
-                        scaleY = s
-                    }
-                ) {
-                    val currentPath = imageEditPath
-                    val currentItemId = imageEditItemId
-                    if (currentPath != null) {
-                        ImageEditorDialog(
-                            imagePath = currentPath,
-                            themeColor = viewModel.themeColor,
-                            onDismiss = {
-                                editingImagePath = null
-                                editingImageItemId = null
-                            },
-                            onSave = { newAbsolutePath ->
-                                val dataDirPath = viewModel.getAbsolutePath("")
-                                val relativePath = newAbsolutePath.removePrefix("$dataDirPath/")
-                                if (currentItemId != null) {
-                                    viewModel.updateImageContent(currentItemId, relativePath)
-                                }
-                                editingImagePath = null
-                                editingImageItemId = null
-                            }
-                        )
-                    }
                 }
             }
         }
@@ -2390,4 +2330,41 @@ fun DeleteConfirmContent(
     }
 }
 
-
+/** 保存图片到系统相册 */
+private fun saveBitmapToGallery(context: android.content.Context, bitmap: android.graphics.Bitmap) {
+    try {
+        val name = "SNOTE_${java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())}.jpg"
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            val v = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, name)
+                put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "${android.os.Environment.DIRECTORY_PICTURES}/Snote")
+                put(android.provider.MediaStore.Images.Media.IS_PENDING, 1)
+            }
+            context.contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v)?.let { uri ->
+                context.contentResolver.openOutputStream(uri)?.use {
+                    bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, it)
+                }
+                v.clear()
+                v.put(android.provider.MediaStore.Images.Media.IS_PENDING, 0)
+                context.contentResolver.update(uri, v, null, null)
+            }
+        } else {
+            val d = java.io.File(
+                android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES),
+                "Snote"
+            )
+            d.mkdirs()
+            java.io.FileOutputStream(java.io.File(d, name)).use {
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, it)
+            }
+        }
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            android.widget.Toast.makeText(context, "已保存到相册", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    } catch (e: Exception) {
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            android.widget.Toast.makeText(context, "保存失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+}
