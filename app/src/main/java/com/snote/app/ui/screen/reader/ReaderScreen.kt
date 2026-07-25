@@ -119,6 +119,11 @@ fun ReaderScreen(
                 val dataDirPath = viewModel.getAbsolutePath("")
                 val relativePath = savedPath.removePrefix("$dataDirPath/")
                 viewModel.updateImageContent(itemId, relativePath)
+                // 保存涂鸦数据，用于下次重新编辑时恢复撤销/重做
+                val doodleJson = result.data?.getStringExtra(IMGEditActivity.EXTRA_DOODLE_JSON)
+                if (doodleJson != null) {
+                    java.io.File(savedPath + ".doodles.json").writeText(doodleJson)
+                }
             }
         }
         pendingEditSavePath = null
@@ -368,6 +373,11 @@ fun ReaderScreen(
                             val intent = Intent(context, IMGEditActivity::class.java)
                                 .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, Uri.fromFile(File(path)))
                                 .putExtra(IMGEditActivity.EXTRA_IMAGE_SAVE_PATH, saveFile.absolutePath)
+                            // 加载已有涂鸦数据
+                            val existingJsonFile = File("$path.doodles.json")
+                            if (existingJsonFile.exists()) {
+                                intent.putExtra(IMGEditActivity.EXTRA_DOODLE_JSON, existingJsonFile.readText())
+                            }
                             imageEditLauncher.launch(intent)
                         },
                         onSaveToGallery = { path ->

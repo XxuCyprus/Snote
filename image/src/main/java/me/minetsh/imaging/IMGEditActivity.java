@@ -14,15 +14,9 @@ import me.minetsh.imaging.core.file.IMGDecoder;
 import me.minetsh.imaging.core.file.IMGFileDecoder;
 import me.minetsh.imaging.core.util.IMGUtils;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.nio.charset.StandardCharsets;
 
 /**
  * Created by felix on 2017/11/14 下午2:26.
@@ -38,45 +32,14 @@ public class IMGEditActivity extends IMGEditBaseActivity {
 
     public static final String EXTRA_IMAGE_SAVE_PATH = "IMAGE_SAVE_PATH";
 
+    public static final String EXTRA_DOODLE_JSON = "DOODLE_JSON";
+
     @Override
     public void onCreated() {
-        // 尝试加载已有的涂鸦数据（重新编辑时恢复撤销/重做历史）
-        // 从图片URI路径加载（现有图片），而非保存路径（新文件）
-        Intent intent = getIntent();
-        if (intent != null) {
-            Uri imageUri;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                imageUri = intent.getParcelableExtra(EXTRA_IMAGE_URI, Uri.class);
-            } else {
-                imageUri = intent.getParcelableExtra(EXTRA_IMAGE_URI);
-            }
-            if (imageUri != null) {
-                String imagePath = imageUri.getPath();
-                if (imagePath != null) {
-                    String doodleJson = loadDoodleJson(imagePath);
-                    if (doodleJson != null) {
-                        mImgView.deserializeDoodles(doodleJson);
-                    }
-                }
-            }
-        }
-    }
-
-    private String loadDoodleJson(String imagePath) {
-        File jsonFile = new File(imagePath + ".doodles.json");
-        if (!jsonFile.exists()) return null;
-        try {
-            StringBuilder sb = new StringBuilder();
-            BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(new FileInputStream(jsonFile), StandardCharsets.UTF_8));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-            }
-            reader.close();
-            return sb.toString();
-        } catch (IOException e) {
-            return null;
+        // 从 Intent extra 加载已有的涂鸦数据
+        String doodleJson = getIntent().getStringExtra(EXTRA_DOODLE_JSON);
+        if (doodleJson != null && !doodleJson.isEmpty()) {
+            mImgView.deserializeDoodles(doodleJson);
         }
     }
 
@@ -202,33 +165,17 @@ public class IMGEditActivity extends IMGEditBaseActivity {
                     }
                 }
 
-                // 保存涂鸦数据（用于重新编辑时恢复撤销/重做）
-                saveDoodleJson(path);
-
-                setResult(RESULT_OK);
+                // 将涂鸦数据放入返回 Intent（由调用方负责持久化）
+                String doodleJson = mImgView.serializeDoodles();
+                Intent resultIntent = new Intent();
+                resultIntent.putExtra(EXTRA_DOODLE_JSON, doodleJson);
+                setResult(RESULT_OK, resultIntent);
                 finish();
                 return;
             }
         }
         setResult(RESULT_CANCELED);
         finish();
-    }
-
-    private void saveDoodleJson(String imagePath) {
-        String json = mImgView.serializeDoodles();
-        if (json == null) return;
-        try {
-            File jsonFile = new File(imagePath + ".doodles.json");
-            FileOutputStream fos = new FileOutputStream(jsonFile);
-            OutputStreamWriter writer = new OutputStreamWriter(fos, StandardCharsets.UTF_8);
-            writer.write(json);
-            writer.flush();
-            // 强制同步到磁盘，确保 finish() 前文件已完整写入
-            fos.getFD().sync();
-            writer.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 
     @Override
