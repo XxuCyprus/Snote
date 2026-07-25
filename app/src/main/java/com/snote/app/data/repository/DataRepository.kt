@@ -413,12 +413,18 @@ class DataRepository @Inject constructor(
                 }
             }
             save()
-            // 删除旧的原始照片文件（如果路径不同）
+            // 删除旧的编辑文件和伴生文件（如果路径不同）
             if (oldPath != newPath) {
-                // 保留旧图片文件（原图），二次编辑时需要加载它作为干净底图
-                // 只清理不需要的伴生文件
-                File(dataDir, "$oldPath.base").let { if (it.exists()) it.delete() }
-                File(dataDir, "$oldPath.strokes").let { if (it.exists()) it.delete() }
+                val oldFile = File(dataDir, oldPath)
+                val isOriginal = !oldFile.name.startsWith("edited_")
+                if (!isOriginal) {
+                    // 旧的编辑文件可以删除（原图保留不动）
+                    fileManager.deleteFile(dataDir, oldPath)
+                } else {
+                    // 原图只清理伴生文件
+                    File(dataDir, "$oldPath.base").let { if (it.exists()) it.delete() }
+                    File(dataDir, "$oldPath.strokes").let { if (it.exists()) it.delete() }
+                }
             }
         }
     }

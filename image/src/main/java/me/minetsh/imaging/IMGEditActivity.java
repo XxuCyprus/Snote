@@ -146,14 +146,29 @@ public class IMGEditActivity extends IMGEditBaseActivity {
             runOnUiThread(() -> {
                 if (json != null && !json.isEmpty()) {
                     mImgView.deserializeDoodles(json);
-                    // 恢复文字贴纸
+                    // 检查是否有裁切数据和贴纸数据需要恢复
                     try {
                         org.json.JSONObject root = new org.json.JSONObject(json);
-                        if (root.has("stickers")) {
-                            mImgView.deserializeStickers(root.getJSONArray("stickers"));
+                        boolean hasClip = root.has("clipFrame");
+                        org.json.JSONArray stickerArr = root.optJSONArray("stickers");
+
+                        if (hasClip) {
+                            // 有裁切数据：等 homing 动画结束后恢复裁切，再恢复贴纸
+                            org.json.JSONObject cfObj = root.getJSONObject("clipFrame");
+                            android.graphics.RectF clipFrame = new android.graphics.RectF(
+                                    (float) cfObj.getDouble("l"),
+                                    (float) cfObj.getDouble("t"),
+                                    (float) cfObj.getDouble("r"),
+                                    (float) cfObj.getDouble("b")
+                            );
+                            float clipRotate = (float) root.optDouble("clipRotate", 0.0);
+                            mImgView.setPendingClipRestore(clipFrame, clipRotate, stickerArr, this);
+                        } else if (stickerArr != null && stickerArr.length() > 0) {
+                            // 无裁切但有贴纸：直接恢复
+                            mImgView.deserializeStickers(stickerArr);
                         }
                     } catch (Exception e) {
-                        Log.e(TAG, "onCreated: failed to restore stickers", e);
+                        Log.e(TAG, "onCreated: failed to restore stickers/clip", e);
                     }
                     if (!mImgView.isDoodleEmpty()) {
                         mImgView.post(() -> {
@@ -334,16 +349,27 @@ public class IMGEditActivity extends IMGEditBaseActivity {
                 return;
             }
 
-            // 序列化涂鸦 + 文字贴纸
+            // 序列化涂鸦 + 文字贴纸 + 裁切参数
             String doodleJson = mImgView.serializeDoodles();
             try {
                 org.json.JSONObject root = new org.json.JSONObject(doodleJson);
                 if (stickerArr.length() > 0) {
                     root.put("stickers", stickerArr);
                 }
+                // 保存裁切参数（Bitmap 空间坐标，用于重新编辑时恢复裁切）
+                if (mImgView.hasClipData()) {
+                    android.graphics.RectF cf = mImgView.getBackupClipFrame();
+                    org.json.JSONObject cfObj = new org.json.JSONObject();
+                    cfObj.put("l", cf.left);
+                    cfObj.put("t", cf.top);
+                    cfObj.put("r", cf.right);
+                    cfObj.put("b", cf.bottom);
+                    root.put("clipFrame", cfObj);
+                    root.put("clipRotate", mImgView.getBackupClipRotate());
+                }
                 doodleJson = root.toString();
             } catch (Exception e) {
-                Log.e(TAG, "onDoneClick: failed to merge stickers", e);
+                Log.e(TAG, "onDoneClick: failed to merge stickers/clip", e);
             }
 
             FileOutputStream fout = null;

@@ -412,24 +412,34 @@ public class IMGImage {
 
     /**
      * 序列化文字贴纸为 JSON 数组
-     * 存储贴纸绝对View坐标 + 保存时 clipFrame 偏移量
-     * 加载时用公式校正：vx_load = vx_save - clipLeft_save + frameLeft_load
+     * 坐标存储为原图像素空间（和涂鸦一样的参考系），不受裁切影响
      */
     public JSONArray serializeStickers() {
         JSONArray arr = new JSONArray();
+        float scale = getScale();
+        if (scale <= 0) return arr;
+        float theta = (float) Math.toRadians(-getRotate());
+        float cos = (float) Math.cos(theta);
+        float sin = (float) Math.sin(theta);
+        float cx = mClipFrame.centerX();
+        float cy = mClipFrame.centerY();
 
         for (IMGSticker sticker : mBackStickers) {
             if (sticker instanceof IMGStickerTextView) {
                 IMGStickerTextView tv = (IMGStickerTextView) sticker;
                 try {
+                    // View 坐标 → 原图 Bitmap 像素坐标
+                    float vx = tv.getX() + tv.getPivotX();
+                    float vy = tv.getY() + tv.getPivotY();
+                    float bx = (vx - mFrame.left) / scale;
+                    float by = (vy - mFrame.top) / scale;
+                    float rx = bx * cos + by * sin + cx * (1 - cos) - cy * sin;
+                    float ry = -bx * sin + by * cos + cy * (1 - cos) + cx * sin;
+
                     JSONObject obj = new JSONObject();
                     obj.put("text", tv.getText().toJson());
-                    // 贴纸中心的绝对View坐标
-                    obj.put("vx", tv.getX() + tv.getPivotX());
-                    obj.put("vy", tv.getY() + tv.getPivotY());
-                    // 保存时 clipFrame 偏移（加载时用于校正裁切导致的位置变化）
-                    obj.put("cfL", mClipFrame.left);
-                    obj.put("cfT", mClipFrame.top);
+                    obj.put("x", Math.round(rx));
+                    obj.put("y", Math.round(ry));
                     obj.put("scale", tv.getScale());
                     obj.put("rotation", tv.getRotation());
                     arr.put(obj);
@@ -443,23 +453,34 @@ public class IMGImage {
 
     /**
      * 反序列化文字贴纸（在主线程调用）
-     * 公式：vx_load = vx_save - clipLeft_save + frameLeft_load
-     * 使用 ViewTreeObserver 确保在布局完成且 homing 动画结束后才设置位置
+     * 原图 Bitmap 像素坐标 → View 坐标
+     * 使用 OnGlobalLayoutListener 确保布局完成后再设置位置
      */
     public void deserializeStickers(JSONArray arr, android.content.Context context,
                                      android.widget.FrameLayout parent) {
         if (arr == null || arr.length() == 0) return;
+        float scale = getScale();
+        if (scale <= 0) return;
+        float theta = (float) Math.toRadians(getRotate());
+        float cos = (float) Math.cos(theta);
+        float sin = (float) Math.sin(theta);
+        float cx = mClipFrame.centerX();
+        float cy = mClipFrame.centerY();
 
         for (int i = 0; i < arr.length(); i++) {
             try {
                 JSONObject obj = arr.getJSONObject(i);
                 IMGText text = IMGText.fromJson(obj.getJSONObject("text"));
-                float vxSave = (float) obj.getDouble("vx");
-                float vySave = (float) obj.getDouble("vy");
-                float clipLeftSave = (float) obj.optDouble("cfL", 0.0);
-                float clipTopSave = (float) obj.optDouble("cfT", 0.0);
+                float rx = (float) obj.getDouble("x");
+                float ry = (float) obj.getDouble("y");
                 float stickerScale = (float) obj.optDouble("scale", 1.0);
                 float rotation = (float) obj.optDouble("rotation", 0.0);
+
+                // Bitmap 坐标 → View 坐标
+                float bx = rx * cos + ry * sin + cx * (1 - cos) - cy * sin;
+                float by = -rx * sin + ry * cos + cy * (1 - cos) + cx * sin;
+                float vx = bx * scale + mFrame.left;
+                float vy = by * scale + mFrame.top;
 
                 IMGStickerTextView tv = new IMGStickerTextView(context);
                 tv.setText(text);
@@ -473,30 +494,53 @@ public class IMGImage {
                 tv.registerCallback((IMGSticker.Callback) parent);
                 addSticker(tv);
 
-                // 使用 OnGlobalLayoutListener 确保布局完成后再设置位置
-                // 这样 getPivotX/Y 和 mFrame 都是正确的最终值
-                final float vxS = vxSave;
-                final float vyS = vySave;
-                final float cfL = clipLeftSave;
-                final float cfT = clipTopSave;
-                final float sc = stickerScale;
+                // 延迟到布局完成后设置位置（此时 getPivotX/Y 才正确）
+                final float targetVx = vx;
+                final float targetVy = vy;
+                final float targetScale = stickerScale;
                 tv.getViewTreeObserver().addOnGlobalLayoutListener(
                         new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
                     @Override
                     public void onGlobalLayout() {
                         tv.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                        // 此时 mFrame 已经是最终值（homing 动画已完成）
-                        float vx = vxS - cfL + mFrame.left;
-                        float vy = vyS - cfT + mFrame.top;
-                        tv.setScale(sc);
-                        tv.setX(vx - tv.getPivotX());
-                        tv.setY(vy - tv.getPivotY());
+                        tv.setScale(targetScale);
+                        tv.setX(targetVx - tv.getPivotX());
+                        tv.setY(targetVy - tv.getPivotY());
                     }
                 });
             } catch (JSONException e) {
                 Log.e(TAG, "deserializeStickers failed", e);
             }
         }
+    }
+
+    /**
+     * 获取裁剪参数备份（Bitmap 空间坐标），用于保存到 JSON
+     */
+    public android.graphics.RectF getBackupClipFrame() {
+        return new android.graphics.RectF(mBackupClipFrame);
+    }
+
+    public float getBackupClipRotate() {
+        return mBackupClipRotate;
+    }
+
+    /**
+     * 从备份恢复裁剪区域（静默，不触发动画）
+     * mBackupClipFrame 是 Bitmap 空间坐标，需要转回 View 空间
+     */
+    public void restoreClip(android.graphics.RectF backupClipFrame, float backupRotate) {
+        // Bitmap 空间 → View 空间
+        float s = getScale();
+        mClipFrame.set(
+                backupClipFrame.left * s + mFrame.left,
+                backupClipFrame.top * s + mFrame.top,
+                backupClipFrame.right * s + mFrame.left,
+                backupClipFrame.bottom * s + mFrame.top
+        );
+        mBackupClipRotate = backupRotate;
+        setTargetRotate(backupRotate);
+        mClipWin.reset(mClipFrame, backupRotate);
     }
 
     /**
