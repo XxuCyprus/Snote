@@ -38,11 +38,23 @@ public class IMGEditActivity extends IMGEditBaseActivity {
     @Override
     public void onCreated() {
         // 尝试加载已有的涂鸦数据（重新编辑时恢复撤销/重做历史）
-        String savePath = getIntent().getStringExtra(EXTRA_IMAGE_SAVE_PATH);
-        if (savePath != null) {
-            String doodleJson = loadDoodleJson(savePath);
-            if (doodleJson != null) {
-                mImgView.deserializeDoodles(doodleJson);
+        // 从图片URI路径加载（现有图片），而非保存路径（新文件）
+        Intent intent = getIntent();
+        if (intent != null) {
+            Uri imageUri;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                imageUri = intent.getParcelableExtra(EXTRA_IMAGE_URI, Uri.class);
+            } else {
+                imageUri = intent.getParcelableExtra(EXTRA_IMAGE_URI);
+            }
+            if (imageUri != null) {
+                String imagePath = imageUri.getPath();
+                if (imagePath != null) {
+                    String doodleJson = loadDoodleJson(imagePath);
+                    if (doodleJson != null) {
+                        mImgView.deserializeDoodles(doodleJson);
+                    }
+                }
             }
         }
     }

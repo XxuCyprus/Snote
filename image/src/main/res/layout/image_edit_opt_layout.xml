@@ -52,7 +52,7 @@
                 android:background="@null"
                 android:contentDescription="前进"
                 android:onClick="onClick"
-                android:src="@drawable/image_btn_undo" />
+                android:src="@drawable/image_btn_redo" />
 
             <TextView
                 android:id="@+id/tv_done"
