@@ -220,20 +220,31 @@ public class IMGImage {
 
     /**
      * 擦除涂鸦中靠近 (x, y) 的路径部分
-     * @param scale 当前视图缩放比例，用于将屏幕坐标转换为图片坐标
+     * @param x 屏幕坐标X（View空间）
+     * @param y 屏幕坐标Y（View空间）
+     * @param radius 擦除半径（屏幕像素）
+     * @param scrollX 当前滚动偏移X
+     * @param scrollY 当前滚动偏移Y
      */
-    public void eraseDoodleAt(float x, float y, float radius, float scale) {
+    public void eraseDoodleAt(float x, float y, float radius, float scrollX, float scrollY) {
         if (mDoodles.isEmpty()) return;
 
-        // 将屏幕坐标转换为图片坐标
-        float imgX = (x - mFrame.left) / scale;
-        float imgY = (y - mFrame.top) / scale;
-        float imgR = radius / scale;
+        // 应用与 addPath 相同的坐标变换（屏幕坐标 → 路径存储坐标）
+        float[] pt = {x, y};
+        M.setTranslate(scrollX, scrollY);
+        M.postRotate(-getRotate(), mClipFrame.centerX(), mClipFrame.centerY());
+        M.postTranslate(-mFrame.left, -mFrame.top);
+        float invScale = 1f / getScale();
+        M.postScale(invScale, invScale);
+        M.mapPoints(pt);
+
+        float imgX = pt[0];
+        float imgY = pt[1];
+        float imgR = radius * invScale;
 
         List<IMGPath> newDoodles = new ArrayList<>();
         for (IMGPath path : mDoodles) {
-            List<IMGPath> parts = path.eraseNear(imgX, imgY, imgR);
-            newDoodles.addAll(parts);
+            newDoodles.addAll(path.eraseNear(imgX, imgY, imgR));
         }
         mDoodles = newDoodles;
     }

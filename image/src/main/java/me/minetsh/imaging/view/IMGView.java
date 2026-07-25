@@ -102,6 +102,9 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         // 保存现在的编辑模式
         mPreMode = mImage.getMode();
 
+        // 切换模式时重置橡皮擦状态
+        mIsEraser = false;
+
         // 设置新的编辑模式
         mImage.setMode(mode);
         mPen.setMode(mode);
@@ -444,7 +447,7 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
             case MotionEvent.ACTION_MOVE:
-                mImage.eraseDoodleAt(event.getX(), event.getY(), mEraserSize, mImage.getScale());
+                mImage.eraseDoodleAt(event.getX(), event.getY(), mEraserSize, getScrollX(), getScrollY());
                 invalidate();
                 return true;
             case MotionEvent.ACTION_UP:
