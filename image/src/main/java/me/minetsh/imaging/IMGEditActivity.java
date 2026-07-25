@@ -67,11 +67,17 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         }
 
         // 如果存在 .base 干净底图，用它来加载（涂鸦通过 JSON 单独恢复）
+        // 先验证 base 文件是有效图片，防止旧代码残留的黑图
         String uriPath = uri.getPath();
         if (uriPath != null) {
             File baseFile = new File(uriPath + ".base");
             if (baseFile.exists() && baseFile.length() > 0) {
-                uri = Uri.fromFile(baseFile);
+                BitmapFactory.Options checkOpts = new BitmapFactory.Options();
+                checkOpts.inJustDecodeBounds = true;
+                BitmapFactory.decodeFile(baseFile.getAbsolutePath(), checkOpts);
+                if (checkOpts.outWidth > 0 && checkOpts.outHeight > 0) {
+                    uri = Uri.fromFile(baseFile);
+                }
             }
         }
 
