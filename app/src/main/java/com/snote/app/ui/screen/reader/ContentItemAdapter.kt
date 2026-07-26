@@ -31,7 +31,8 @@ class ContentItemAdapter(
     private val onImageClick: (String) -> Unit,
     private val onVideoClick: (String) -> Unit,
     private val onImageEdit: (String, String) -> Unit,
-    private val onSaveToGallery: (String) -> Unit
+    private val onSaveToGallery: (String) -> Unit,
+    private val onFileClick: (String) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     init {
@@ -272,6 +273,9 @@ class ContentItemAdapter(
                 ContentType.FILE -> {
                     fileArea.visibility = View.VISIBLE
                     tvFileName.text = File(item.content).name
+                    fileArea.isClickable = true
+                    fileArea.isFocusable = true
+                    fileArea.setOnClickListener { onFileClick(getAbsolutePath(item.content)) }
                 }
             }
 

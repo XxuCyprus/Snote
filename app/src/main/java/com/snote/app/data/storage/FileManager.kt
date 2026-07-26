@@ -144,6 +144,10 @@ class FileManager {
             mimeType?.contains("mp3") == true -> ".mp3"
             mimeType?.contains("wav") == true -> ".wav"
             mimeType?.contains("pdf") == true -> ".pdf"
+            mimeType?.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document") == true -> ".docx"
+            mimeType?.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") == true -> ".xlsx"
+            mimeType?.equals("application/msword") == true -> ".doc"
+            mimeType?.equals("application/vnd.ms-excel") == true -> ".xls"
             else -> {
                 // 从URI路径获取扩展名
                 val path = uri.path ?: return ".bin"

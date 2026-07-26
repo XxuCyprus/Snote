@@ -452,6 +452,14 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    fun addFileContent(uri: Uri) {
+        val chapterId = _currentChapter.value?.id ?: return
+        viewModelScope.launch {
+            repository.addFileContent(notebookId, chapterId, uri)
+            refreshAfterContentChange(chapterId)
+        }
+    }
+
     fun deleteContentItem(itemId: String) {
         val chapterId = _currentChapter.value?.id ?: return
         viewModelScope.launch {

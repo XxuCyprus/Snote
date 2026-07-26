@@ -47,6 +47,9 @@ class HomeViewModel @Inject constructor(
     private val _showStoragePermissionDialog = MutableStateFlow(false)
     val showStoragePermissionDialog: StateFlow<Boolean> = _showStoragePermissionDialog.asStateFlow()
 
+    // 记录初始化时的权限状态，用于 ON_RESUME 时检测权限变更
+    private var hadStoragePermission = false
+
     init {
         loadData()
     }
@@ -58,11 +61,30 @@ class HomeViewModel @Inject constructor(
             _notebooks.value = repository.getAllNotebooks()
             _isLoading.value = false
 
+            hadStoragePermission = repository.hasFullStorageAccess()
+
             // 检测是否需要存储权限
             if (needsStoragePermission()) {
                 _showStoragePermissionDialog.value = true
             }
         }
+    }
+
+    /**
+     * Activity ON_RESUME 时调用。
+     * 检测权限是否在设置页面中被授予，如果是则强制重新加载数据。
+     */
+    fun onAppResume() {
+        val hasPerm = repository.hasFullStorageAccess()
+        if (!hadStoragePermission && hasPerm) {
+            hadStoragePermission = true
+            viewModelScope.launch {
+                repository.reinitialize()
+                repository.initializeDataDir()
+                _notebooks.value = repository.getAllNotebooks()
+            }
+        }
+        hadStoragePermission = hasPerm
     }
 
     fun refresh() {
@@ -129,8 +151,10 @@ class HomeViewModel @Inject constructor(
     private fun needsStoragePermission(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
         if (Environment.isExternalStorageManager()) return false
-        // 已有数据文件说明之前的安装遗留了数据，但现在无法读取
-        if (_notebooks.value.isEmpty()) return true
+        // 检查是否存在旧安装遗留的数据文件（无权限时读不到，但可判断文件存在性）
+        val dataDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+        val dataFile = java.io.File(java.io.File(dataDir, "Snote"), "snote_data.json")
+        if (_notebooks.value.isEmpty() && dataFile.exists()) return true
         return false
     }
 }

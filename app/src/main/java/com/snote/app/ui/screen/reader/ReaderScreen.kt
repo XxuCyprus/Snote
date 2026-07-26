@@ -233,6 +233,12 @@ fun ReaderScreen(
         uri?.let { viewModel.addVideoContent(it) }
     }
 
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.addFileContent(it) }
+    }
+
 
     Scaffold(
         topBar = {
@@ -357,6 +363,7 @@ fun ReaderScreen(
 
                 // 删除确认状态
                 var videoTargetPath by remember { mutableStateOf<String?>(null) }
+                var fileTargetPath by remember { mutableStateOf<String?>(null) }
 
                 // RecyclerView 适配器 — 不可用 remember(chapter.id)，否则切换章节时
                 // 创建的 adapter 实例不会挂到 RecyclerView 上（factory 只执行一次）
@@ -406,6 +413,7 @@ fun ReaderScreen(
                             val intent = Intent(context, IMGEditActivity::class.java)
                                 .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, Uri.fromFile(File(loadPath)))
                                 .putExtra(IMGEditActivity.EXTRA_IMAGE_SAVE_PATH, saveFile.absolutePath)
+                                .putExtra("THEME_COLOR", viewModel.themeColor.hashCode())
                             // 加载已有涂鸦数据（通过文件路径避免 TransactionTooLargeException）
                             if (existingJsonFile.exists()) {
                                 intent.putExtra(IMGEditActivity.EXTRA_DOODLE_FILE_PATH, existingJsonFile.absolutePath)
@@ -421,7 +429,8 @@ fun ReaderScreen(
                                     bmp.recycle()
                                 }
                             }
-                        }
+                        },
+                        onFileClick = { path -> fileTargetPath = path }
                     )
                 }
                 LaunchedEffect(sortedItems) {
@@ -488,6 +497,35 @@ fun ReaderScreen(
                         android.widget.Toast.makeText(context, "无法播放：${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                     }
                     videoTargetPath = null
+                }
+
+                // 文件打开（用系统应用）
+                LaunchedEffect(fileTargetPath) {
+                    val path = fileTargetPath ?: return@LaunchedEffect
+                    try {
+                        val file = File(path)
+                        if (file.exists()) {
+                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                            val mimeType = when {
+                                path.endsWith(".pdf", true) -> "application/pdf"
+                                path.endsWith(".docx", true) -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                path.endsWith(".doc", true) -> "application/msword"
+                                path.endsWith(".xlsx", true) -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                path.endsWith(".xls", true) -> "application/vnd.ms-excel"
+                                else -> "*/*"
+                            }
+                            val intent = Intent(Intent.ACTION_VIEW).apply {
+                                setDataAndType(uri, mimeType)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(Intent.createChooser(intent, "选择应用打开"))
+                        } else {
+                            android.widget.Toast.makeText(context, "文件不存在", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e: Exception) {
+                        android.widget.Toast.makeText(context, "无法打开：${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                    fileTargetPath = null
                 }
 
                 // 离开页面时释放音频播放器
@@ -711,7 +749,8 @@ fun ReaderScreen(
                         onAddText = { text -> viewModel.addTextContent(text) },
                         onAddImage = { imagePickerLauncher.launch("image/*") },
                         onAddVideo = { videoPickerLauncher.launch("video/*") },
-                        onAddAudio = { viewModel.switchToRecorder() }
+                        onAddAudio = { viewModel.switchToRecorder() },
+                        onAddFile = { filePickerLauncher.launch("application/*") }
                     )
                     "record" -> AudioRecorderDialogContent(
                         themeColor = viewModel.themeColor,
@@ -1540,7 +1579,8 @@ fun AddContentDialog(
     onAddText: (String) -> Unit,
     onAddImage: () -> Unit,
     onAddVideo: () -> Unit,
-    onAddAudio: () -> Unit
+    onAddAudio: () -> Unit,
+    onAddFile: () -> Unit
 ) {
     var textContent by remember { mutableStateOf("") }
     var showTextInput by remember { mutableStateOf(false) }
@@ -1642,6 +1682,12 @@ fun AddContentDialog(
                             title = "添加音频",
                             themeColor = themeColor,
                             onClick = onAddAudio
+                        )
+                        ContentOptionButton(
+                            icon = Icons.Rounded.InsertDriveFile,
+                            title = "添加文件",
+                            themeColor = themeColor,
+                            onClick = onAddFile
                         )
                     }
                 }

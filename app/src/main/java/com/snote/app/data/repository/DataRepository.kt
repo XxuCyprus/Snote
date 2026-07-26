@@ -59,6 +59,14 @@ class DataRepository @Inject constructor(
     }
 
     /**
+     * 重置初始化标记，允许下次 initializeDataDir 重新加载数据。
+     * 用于权限变更后强制重新扫描数据目录。
+     */
+    fun reinitialize() {
+        isInitialized = false
+    }
+
+    /**
      * 初始化数据目录
      */
     suspend fun initializeDataDir() = withContext(Dispatchers.IO) {
@@ -356,6 +364,22 @@ class DataRepository @Inject constructor(
     ): ContentItem? = withContext(Dispatchers.IO) {
         val chapter = findChapterInNotebook(notebookId, chapterId) ?: return@withContext null
         val item = ContentItem(type = ContentType.AUDIO, content = relativePath, order = chapter.items.size)
+        withNotebook(notebookId) { nb ->
+            nb.withChapter(chapterId) { ch -> ch.copy(items = ch.items + item) }
+        }
+        save()
+        item
+    }
+
+    /**
+     * 添加文件内容（Word/PDF/Excel 等）
+     */
+    suspend fun addFileContent(notebookId: String, chapterId: String, fileUri: android.net.Uri): ContentItem? = withContext(Dispatchers.IO) {
+        val relativePath = fileManager.copyFileToNotebook(context, fileUri, dataDir, notebookId, "FILE")
+            ?: return@withContext null
+
+        val chapter = findChapterInNotebook(notebookId, chapterId) ?: return@withContext null
+        val item = ContentItem(type = ContentType.FILE, content = relativePath, order = chapter.items.size)
         withNotebook(notebookId) { nb ->
             nb.withChapter(chapterId) { ch -> ch.copy(items = ch.items + item) }
         }
