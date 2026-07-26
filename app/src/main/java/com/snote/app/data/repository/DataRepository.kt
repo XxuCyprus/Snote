@@ -59,11 +59,12 @@ class DataRepository @Inject constructor(
     }
 
     /**
-     * 重置初始化标记，允许下次 initializeDataDir 重新加载数据。
+     * 重置初始化标记 + 数据目录，允许下次 initializeDataDir 重新加载数据。
      * 用于权限变更后强制重新扫描数据目录。
      */
     fun reinitialize() {
         isInitialized = false
+        dataDir = getDefaultDataDir()
     }
 
     /**
@@ -76,6 +77,15 @@ class DataRepository @Inject constructor(
         }
         isInitialized = true
 
+        // 无权限 + 外部有旧数据 = 切到内部存储，避免覆盖安装1的数据
+        if (!hasFullStorageAccess() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val externalDataFile = File(dataDir, "snote_data.json")
+            if (externalDataFile.exists() && externalDataFile.length() > 0) {
+                Log.w(TAG, "检测到旧数据文件但无权限读取，切换到内部存储以避免覆盖")
+                dataDir = File(context.filesDir, "Snote")
+            }
+        }
+
         Log.d(TAG, "数据目录: ${dataDir.absolutePath}")
         Log.d(TAG, "目录存在: ${dataDir.exists()}")
 
@@ -86,15 +96,64 @@ class DataRepository @Inject constructor(
 
         data = jsonStorage.loadData(dataDir)
         Log.d(TAG, "加载完成, 笔记本数: ${data.notebooks.size}")
+    }
 
-        if (data.notebooks.isEmpty() && !hasFullStorageAccess() &&
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
-        ) {
-            val externalFile = File(dataDir, "snote_data.json")
-            if (externalFile.exists() && externalFile.length() > 0) {
-                Log.w(TAG, "旧数据文件存在但无法读取，需要MANAGE_EXTERNAL_STORAGE权限")
+    /**
+     * 权限刚被授予 + 当前在用内部存储 → 迁移合并到外部 Documents/Snote/
+     */
+    suspend fun mergeAndSwitchToExternal() = withContext(Dispatchers.IO) {
+        if (!hasFullStorageAccess()) return@withContext
+
+        val externalDir = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
+            "Snote"
+        )
+        if (!externalDir.exists()) externalDir.mkdirs()
+
+        val externalData = try {
+            jsonStorage.loadData(externalDir)
+        } catch (_: Exception) { SnoteData() }
+
+        // 合并：外部旧数据 + 当前内部新增数据
+        val mergedNotebooks = externalData.notebooks.toMutableList()
+        for (nb in data.notebooks) {
+            if (mergedNotebooks.none { it.id == nb.id }) {
+                mergedNotebooks.add(nb)
             }
         }
+        data = SnoteData(notebooks = mergedNotebooks)
+
+        // 复制内部文件到外部（只复制不存在的文件，不覆盖旧文件）
+        val internalDir = dataDir
+        internalDir.listFiles()?.forEach { file ->
+            if (file.isDirectory && file.name != "covers") {
+                val targetDir = File(externalDir, file.name)
+                file.copyRecursively(targetDir, overwrite = false)
+            }
+        }
+        // 封面
+        val internalCovers = File(internalDir, "covers")
+        if (internalCovers.exists()) {
+            internalCovers.copyRecursively(File(externalDir, "covers"), overwrite = false)
+        }
+
+        // 保存合并数据到外部
+        jsonStorage.saveData(externalDir, data)
+
+        // 切换目录
+        dataDir = externalDir
+        isInitialized = false
+        Log.d(TAG, "已迁移到外部存储: ${externalDir.absolutePath}")
+    }
+
+    /**
+     * 权限被撤销时调用：把当前内存数据快照保存到内部存储，防止后续外存写失败导致数据丢失
+     */
+    fun saveSnapshotToInternal() {
+        val internalDir = File(context.filesDir, "Snote")
+        if (!internalDir.exists()) internalDir.mkdirs()
+        jsonStorage.saveData(internalDir, data)
+        Log.d(TAG, "已保存快照到内部存储")
     }
 
     /**

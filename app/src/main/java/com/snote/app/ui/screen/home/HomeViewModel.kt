@@ -77,12 +77,22 @@ class HomeViewModel @Inject constructor(
     fun onAppResume() {
         val hasPerm = repository.hasFullStorageAccess()
         if (!hadStoragePermission && hasPerm) {
+            // 权限从无→有：迁移合并内部数据到外部，然后重新加载
             hadStoragePermission = true
             viewModelScope.launch {
+                repository.mergeAndSwitchToExternal()
                 repository.reinitialize()
                 repository.initializeDataDir()
                 _notebooks.value = repository.getAllNotebooks()
+                _showStoragePermissionDialog.value = false
             }
+        } else if (hadStoragePermission && !hasPerm) {
+            // 权限从有→无：快照当前数据到内部存储，然后提醒用户
+            hadStoragePermission = false
+            viewModelScope.launch {
+                repository.saveSnapshotToInternal()
+            }
+            _showStoragePermissionDialog.value = true
         }
         hadStoragePermission = hasPerm
     }
