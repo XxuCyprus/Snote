@@ -142,8 +142,6 @@ public class IMGImage {
 
     private List<UndoOp> mUndoOps = new ArrayList<>();
 
-    private static final int MAX_SERIALIZED_HISTORY = 700;
-
     /**
      * 临时隐藏涂鸦（用于生成干净底图）
      */
@@ -329,46 +327,63 @@ public class IMGImage {
      */
     public String serializeDoodles() {
         try {
+            long startTime = System.currentTimeMillis();
             JSONObject root = new JSONObject();
             root.put("doodles", IMGPath.listToJson(mDoodles));
 
             // 只保存到当前历史位置的撤销操作（不保存被撤销的步骤）
             JSONArray undoArr = new JSONArray();
+            // 存储初始状态（mHistory[0]），防止反序列化时丢失第一个 addPath
+            if (mHistoryIndex > 0 && !mHistory.get(0).isEmpty()) {
+                JSONObject initEntry = new JSONObject();
+                initEntry.put("t", "i");
+                initEntry.put("s", IMGPath.listToJson(mHistory.get(0)));
+                undoArr.put(initEntry);
+            }
             for (int i = 0; i < mHistoryIndex; i++) {
-                UndoOp op = mUndoOps.get(i);
-                JSONObject entry = new JSONObject();
-                if (op == null) {
-                    // ADD 操作：路径就是 mHistory[i+1] 的最后一个元素
-                    List<IMGPath> nextSnapshot = mHistory.get(i + 1);
-                    if (!nextSnapshot.isEmpty()) {
-                        entry.put("t", "a");
-                        entry.put("p", nextSnapshot.get(nextSnapshot.size() - 1).toJson());
+                try {
+                    UndoOp op = mUndoOps.get(i);
+                    JSONObject entry = new JSONObject();
+                    if (op == null) {
+                        // ADD 操作：路径就是 mHistory[i+1] 的最后一个元素
+                        List<IMGPath> nextSnapshot = mHistory.get(i + 1);
+                        if (!nextSnapshot.isEmpty()) {
+                            entry.put("t", "a");
+                            entry.put("p", nextSnapshot.get(nextSnapshot.size() - 1).toJson());
+                        }
+                    } else {
+                        // ERASE 操作
+                        entry.put("t", "e");
+                        entry.put("r", IMGPath.listToJson(op.removed));
+                        JSONArray posArr = new JSONArray();
+                        for (int p : op.positions) posArr.put(p);
+                        entry.put("pos", posArr);
+                        entry.put("snap", IMGPath.listToJson(op.preEraseSnapshot));
+                        if (op.postEraseState != null) {
+                            entry.put("post", IMGPath.listToJson(op.postEraseState));
+                        }
                     }
-                } else {
-                    // ERASE 操作
-                    entry.put("t", "e");
-                    entry.put("r", IMGPath.listToJson(op.removed));
-                    JSONArray posArr = new JSONArray();
-                    for (int p : op.positions) posArr.put(p);
-                    entry.put("pos", posArr);
-                    entry.put("snap", IMGPath.listToJson(op.preEraseSnapshot));
-                    if (op.postEraseState != null) {
-                        entry.put("post", IMGPath.listToJson(op.postEraseState));
-                    }
+                    undoArr.put(entry);
+                } catch (Exception e) {
+                    Log.w(TAG, "serializeDoodles: skip entry " + i, e);
                 }
-                undoArr.put(entry);
             }
             root.put("undo", undoArr);
+            long elapsed = System.currentTimeMillis() - startTime;
             Log.d(TAG, "serializeDoodles: mHistory.size=" + mHistory.size()
                 + ", mUndoOps.size=" + mUndoOps.size()
                 + ", undoArr.length=" + undoArr.length()
                 + ", mHistoryIndex=" + mHistoryIndex
                 + ", currentDoodles=" + mDoodles.size()
-                + ", truncated=" + (mUndoOps.size() - mHistoryIndex));
+                + ", elapsed=" + elapsed + "ms");
 
             return root.toString();
         } catch (JSONException e) {
             Log.e(TAG, "serializeDoodles failed", e);
+            return "{}";
+        } catch (OutOfMemoryError e) {
+            Log.e(TAG, "serializeDoodles OOM", e);
+            System.gc();
             return "{}";
         }
     }
@@ -393,37 +408,45 @@ public class IMGImage {
                     mHistory.add(new ArrayList<IMGPath>());
                     Log.d(TAG, "deserializeDoodles: undoArr.length=" + undoArr.length() + ", currentDoodles=" + mDoodles.size());
                     for (int i = 0; i < undoArr.length(); i++) {
-                        JSONObject entry = undoArr.getJSONObject(i);
-                        String type = entry.optString("t", "");
-                        if (type.equals("a")) {
-                            IMGPath added = IMGPath.fromJson(entry.getJSONObject("p"));
-                            List<IMGPath> prev = mHistory.get(mHistory.size() - 1);
-                            List<IMGPath> next = new ArrayList<>(prev);
-                            next.add(added);
-                            mHistory.add(next);
-                            mUndoOps.add(null);
-                        } else if (type.equals("e")) {
-                            List<IMGPath> snapshot = IMGPath.listFromJson(entry.getJSONArray("snap"));
-                            List<IMGPath> removed = IMGPath.listFromJson(entry.getJSONArray("r"));
-                            JSONArray posArr = entry.getJSONArray("pos");
-                            List<Integer> positions = new ArrayList<>();
-                            for (int j = 0; j < posArr.length(); j++) positions.add(posArr.getInt(j));
-                            List<IMGPath> afterErase;
-                            if (entry.has("post")) {
-                                // 新格式：直接使用存储的擦除后状态（最可靠）
-                                afterErase = IMGPath.listFromJson(entry.getJSONArray("post"));
-                            } else {
-                                // 旧格式：从 snapshot 中移除被擦除路径
-                                afterErase = new ArrayList<>(snapshot);
-                                for (int j = positions.size() - 1; j >= 0; j--) {
-                                    int pos = positions.get(j);
-                                    if (pos >= 0 && pos < afterErase.size()) {
-                                        afterErase.remove(pos);
+                        try {
+                            JSONObject entry = undoArr.getJSONObject(i);
+                            String type = entry.optString("t", "");
+                            if (type.equals("i")) {
+                                // 初始状态：添加为新条目，保留空的 mHistory[0]
+                                mHistory.add(IMGPath.listFromJson(entry.getJSONArray("s")));
+                                mUndoOps.add(null);
+                            } else if (type.equals("a")) {
+                                IMGPath added = IMGPath.fromJson(entry.getJSONObject("p"));
+                                List<IMGPath> prev = mHistory.get(mHistory.size() - 1);
+                                List<IMGPath> next = new ArrayList<>(prev);
+                                next.add(added);
+                                mHistory.add(next);
+                                mUndoOps.add(null);
+                            } else if (type.equals("e")) {
+                                List<IMGPath> snapshot = IMGPath.listFromJson(entry.getJSONArray("snap"));
+                                List<IMGPath> removed = IMGPath.listFromJson(entry.getJSONArray("r"));
+                                JSONArray posArr = entry.getJSONArray("pos");
+                                List<Integer> positions = new ArrayList<>();
+                                for (int j = 0; j < posArr.length(); j++) positions.add(posArr.getInt(j));
+                                List<IMGPath> afterErase;
+                                if (entry.has("post")) {
+                                    // 新格式：直接使用存储的擦除后状态（最可靠）
+                                    afterErase = IMGPath.listFromJson(entry.getJSONArray("post"));
+                                } else {
+                                    // 旧格式：从 snapshot 中移除被擦除路径
+                                    afterErase = new ArrayList<>(snapshot);
+                                    for (int j = positions.size() - 1; j >= 0; j--) {
+                                        int pos = positions.get(j);
+                                        if (pos >= 0 && pos < afterErase.size()) {
+                                            afterErase.remove(pos);
+                                        }
                                     }
                                 }
+                                mHistory.add(afterErase);
+                                mUndoOps.add(new UndoOp(removed, positions, snapshot, afterErase));
                             }
-                            mHistory.add(afterErase);
-                            mUndoOps.add(new UndoOp(removed, positions, snapshot, afterErase));
+                        } catch (Exception e) {
+                            Log.w(TAG, "deserializeDoodles: skip entry " + i, e);
                         }
                     }
                     mHistoryIndex = mHistory.size() - 1;
@@ -462,6 +485,26 @@ public class IMGImage {
                 }
             } catch (JSONException e) {
                 Log.e(TAG, "deserializeDoodles failed", e);
+                // 确保至少有一个历史条目
+                if (mHistory.isEmpty()) {
+                    mHistory.add(new ArrayList<>(mDoodles));
+                    mHistoryIndex = 0;
+                }
+            } catch (OutOfMemoryError e) {
+                Log.e(TAG, "deserializeDoodles OOM", e);
+                System.gc();
+                // 降级：只保留当前状态
+                mHistory.clear();
+                mUndoOps.clear();
+                mHistory.add(new ArrayList<>(mDoodles));
+                mHistoryIndex = 0;
+            } catch (Exception e) {
+                Log.e(TAG, "deserializeDoodles unexpected error", e);
+                // 降级：只保留当前状态
+                mHistory.clear();
+                mUndoOps.clear();
+                mHistory.add(new ArrayList<>(mDoodles));
+                mHistoryIndex = 0;
             }
         }
         invalidateDoodlesCache();
@@ -679,6 +722,7 @@ public class IMGImage {
             }
         }
         mDoodles = newDoodles;
+        invalidateDoodlesCache();
     }
 
     public RectF getClipFrame() {
@@ -813,8 +857,10 @@ public class IMGImage {
             case DOODLE:
                 pushHistory();
                 mDoodles.add(path);
-                // 更新历史条目为添加后的状态（确保序列化时历史与当前一致）
-                mHistory.set(mHistoryIndex, new ArrayList<>(mDoodles));
+                // 保存添加后的状态为新条目（不覆盖pushHistory刚保存的快照）
+                mHistory.add(new ArrayList<>(mDoodles));
+                mUndoOps.add(null);
+                mHistoryIndex = mHistory.size() - 1;
                 invalidateDoodlesCache();
                 break;
         }
@@ -955,15 +1001,6 @@ public class IMGImage {
             float scale = getScale();
             canvas.translate(mFrame.left, mFrame.top);
             canvas.scale(scale, scale);
-
-            // 擦除期间：直接绘制所有路径到屏幕，跳过缓存重建
-            if (mEraseSessionActive) {
-                for (IMGPath path : mDoodles) {
-                    path.onDrawDoodle(canvas, mPaint);
-                }
-                canvas.restore();
-                return;
-            }
 
             int imgW = mImage.getWidth();
             int imgH = mImage.getHeight();

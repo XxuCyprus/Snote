@@ -155,7 +155,7 @@ class DataRepository @Inject constructor(
      */
     suspend fun scanAndRecoverOrphanedData(): Int = withContext(Dispatchers.IO) {
         val existingNotebooks = data.notebooks.toMutableList()
-        var changed = false
+        var recoveredCount = 0
 
         // 扫描 dataDir 所有子目录（跳过 covers）
         val allDirs = (dataDir.listFiles() ?: emptyArray()).filter { it.isDirectory && it.name != "covers" }
@@ -182,7 +182,7 @@ class DataRepository @Inject constructor(
                     val restored = existingNotebook.copy(chapters = listOf(chapter))
                     val idx = existingNotebooks.indexOfFirst { it.id == notebookId }
                     if (idx >= 0) existingNotebooks[idx] = restored
-                    changed = true
+                    recoveredCount++
                     Log.d(TAG, "补全已有笔记本: $notebookId, 文件数: ${items.size}")
                 }
             } else {
@@ -198,17 +198,17 @@ class DataRepository @Inject constructor(
                     chapters = listOf(chapter)
                 )
                 existingNotebooks.add(notebook)
-                changed = true
+                recoveredCount++
                 Log.d(TAG, "新建恢复笔记本: $notebookId, 文件数: ${items.size}")
             }
         }
 
-        if (!changed) return@withContext 0
+        if (recoveredCount == 0) return@withContext 0
 
         data = data.copy(notebooks = existingNotebooks)
         save()
         Log.d(TAG, "恢复完成, 总笔记本数: ${existingNotebooks.size}")
-        existingNotebooks.size - existingIds.size + (if (changed) 1 else 0) // approximate
+        recoveredCount
     }
 
     /** 扫描指定媒体目录，将文件转为 ContentItem */
