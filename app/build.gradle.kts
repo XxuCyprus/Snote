@@ -59,6 +59,13 @@ android {
         compose = true
         buildConfig = true
     }
+
+    applicationVariants.all {
+        outputs.all {
+            val output = this as com.android.build.gradle.internal.api.ApkVariantOutputImpl
+            output.outputFileName = "Snote-v${versionName}.apk"
+        }
+    }
 }
 
 dependencies {
