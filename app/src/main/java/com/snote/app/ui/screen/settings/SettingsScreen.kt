@@ -227,7 +227,7 @@ fun SettingsScreen(
                             }
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "一款专为学习设计的笔记应用。支持文字、图片、视频、音频、文件（Word/PDF/Excel）等多种内容类型，支持章节分级管理、图片涂鸦编辑、内容重命名，打造结构化的电子书式阅读体验。",
+                                text = "一款轻量级学习笔记应用，整合文字、图片、视频、音频与文件（Word/PDF/Excel）等多种内容，提供章节分级管理、图片涂鸦编辑、内容重命名等能力，打造结构化的电子书式阅读体验。",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 lineHeight = 24.sp
