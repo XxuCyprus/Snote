@@ -406,6 +406,7 @@ fun ReaderScreen(
                             val intent = Intent(context, IMGEditActivity::class.java)
                                 .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, Uri.fromFile(File(loadPath)))
                                 .putExtra(IMGEditActivity.EXTRA_IMAGE_SAVE_PATH, saveFile.absolutePath)
+                                .putExtra("THEME_COLOR", viewModel.themeColor.hashCode())
                             // 加载已有涂鸦数据（通过文件路径避免 TransactionTooLargeException）
                             if (existingJsonFile.exists()) {
                                 intent.putExtra(IMGEditActivity.EXTRA_DOODLE_FILE_PATH, existingJsonFile.absolutePath)

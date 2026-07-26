@@ -1,5 +1,6 @@
 package com.snote.app.ui.screen.settings
 
+import com.snote.app.BuildConfig
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -172,7 +173,7 @@ fun SettingsScreen(
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = "版本 1.0.0",
+                                        text = "版本 ${BuildConfig.VERSION_NAME}",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )

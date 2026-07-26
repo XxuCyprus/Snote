@@ -351,18 +351,30 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         m.setScale(scale, scale, frame.left, frame.top);
         m.mapRect(frame);
 
-        Bitmap bitmap = Bitmap.createBitmap(Math.round(frame.width()),
-                Math.round(frame.height()), Bitmap.Config.ARGB_8888);
+        int w = Math.round(frame.width());
+        int h = Math.round(frame.height());
+        // 限制最大尺寸，防止OOM
+        if (w <= 0 || h <= 0 || w > 4096 || h > 4096) {
+            Log.e(TAG, "saveBitmap: invalid size " + w + "x" + h);
+            return null;
+        }
 
-        Canvas canvas = new Canvas(bitmap);
+        try {
+            Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
 
-        // 平移到基画布原点&缩放到原尺寸
-        canvas.translate(-frame.left, -frame.top);
-        canvas.scale(scale, scale, frame.left, frame.top);
+            // 平移到基画布原点&缩放到原尺寸
+            canvas.translate(-frame.left, -frame.top);
+            canvas.scale(scale, scale, frame.left, frame.top);
 
-        onDrawImages(canvas);
+            onDrawImages(canvas);
 
-        return bitmap;
+            return bitmap;
+        } catch (OutOfMemoryError e) {
+            Log.e(TAG, "saveBitmap OOM: " + w + "x" + h, e);
+            System.gc();
+            return null;
+        }
     }
 
     /**

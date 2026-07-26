@@ -6,6 +6,7 @@ import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ImageButton;
+import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.ViewSwitcher;
@@ -50,10 +51,15 @@ abstract class IMGEditBaseActivity extends Activity implements View.OnClickListe
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // 读取笔记主题色
+        if (getIntent() != null) {
+            ((IMGEditActivity) this).mThemeColor = getIntent().getIntExtra("THEME_COLOR", 0xFF1565C0);
+        }
         Bitmap bitmap = getBitmap();
         if (bitmap != null) {
             setContentView(R.layout.image_edit_activity);
             initViews();
+            applyThemeColor();
             mImgView.setImageBitmap(bitmap);
             onCreated();
         } else finish();
@@ -61,6 +67,16 @@ abstract class IMGEditBaseActivity extends Activity implements View.OnClickListe
 
     public void onCreated() {
 
+    }
+
+    private void applyThemeColor() {
+        int color = ((IMGEditActivity) this).mThemeColor;
+        // SeekBar 进度条和滑块颜色
+        mStrokeWidthBar.getProgressDrawable().setColorFilter(color, android.graphics.PorterDuff.Mode.SRC_IN);
+        mStrokeWidthBar.getThumb().setColorFilter(color, android.graphics.PorterDuff.Mode.SRC_IN);
+        // 完成按钮文字色
+        android.widget.TextView doneBtn = findViewById(R.id.tv_done);
+        if (doneBtn != null) doneBtn.setTextColor(color);
     }
 
     private void initViews() {
@@ -136,17 +152,36 @@ abstract class IMGEditBaseActivity extends Activity implements View.OnClickListe
 
         if (eraser) {
             mStrokeWidthBar.setProgress((int) mImgView.getEraserSize());
+            // 橡皮擦选中时着色
+            mEraserBtn.getDrawable().mutate().setColorFilter(
+                ((IMGEditActivity) this).mThemeColor, android.graphics.PorterDuff.Mode.SRC_IN);
         } else {
             mStrokeWidthBar.setProgress((int) mImgView.getPenStrokeWidth());
+            mEraserBtn.getDrawable().clearColorFilter();
         }
     }
 
     public void updateModeUI() {
         IMGMode mode = mImgView.getMode();
+        int color = ((IMGEditActivity) this).mThemeColor;
+        RadioButton rbDoodle = findViewById(R.id.rb_doodle);
+        ImageButton btnText = findViewById(R.id.btn_text);
+        ImageButton btnClip = findViewById(R.id.btn_clip);
+        // 重置所有图标颜色（带null检查）
+        if (rbDoodle != null && rbDoodle.getButtonDrawable() != null)
+            rbDoodle.getButtonDrawable().clearColorFilter();
+        if (btnText != null && btnText.getDrawable() != null)
+            btnText.getDrawable().clearColorFilter();
+        if (btnClip != null && btnClip.getDrawable() != null)
+            btnClip.getDrawable().clearColorFilter();
         switch (mode) {
             case DOODLE:
                 mModeGroup.check(R.id.rb_doodle);
                 setOpSubDisplay(OP_SUB_DOODLE);
+                // 标记图标着色为主题色
+                if (rbDoodle != null && rbDoodle.getButtonDrawable() != null) {
+                    rbDoodle.getButtonDrawable().mutate().setColorFilter(color, android.graphics.PorterDuff.Mode.SRC_IN);
+                }
                 break;
             case NONE:
                 mModeGroup.clearCheck();
@@ -161,6 +196,7 @@ abstract class IMGEditBaseActivity extends Activity implements View.OnClickListe
             mTextDialog.setOnShowListener(this);
             mTextDialog.setOnDismissListener(this);
         }
+        mTextDialog.setThemeColor(((IMGEditActivity) this).mThemeColor);
         mTextDialog.show();
     }
 

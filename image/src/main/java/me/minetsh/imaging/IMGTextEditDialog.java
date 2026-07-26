@@ -75,6 +75,13 @@ public class IMGTextEditDialog extends Dialog implements View.OnClickListener,
         setText(new IMGText(null, Color.WHITE));
     }
 
+    public void setThemeColor(int color) {
+        View doneBtn = findViewById(R.id.tv_done);
+        if (doneBtn instanceof android.widget.TextView) {
+            ((android.widget.TextView) doneBtn).setTextColor(color);
+        }
+    }
+
     @Override
     public void onClick(View v) {
         int vid = v.getId();
