@@ -28,6 +28,10 @@ public class IMGPath {
 
     private float width = BASE_DOODLE_WIDTH;
 
+    // 缓存路径点，避免序列化时重复计算
+    private float[] cachedPoints = null;
+    private boolean pointsCacheDirty = true;
+
     public static final float BASE_DOODLE_WIDTH = 20f;
 
     public IMGPath() {
@@ -59,6 +63,8 @@ public class IMGPath {
 
     public void setPath(Path path) {
         this.path = path;
+        pointsCacheDirty = true;
+        cachedPoints = null;
     }
 
     public int getColor() {
@@ -95,6 +101,8 @@ public class IMGPath {
 
     public void transform(Matrix matrix) {
         path.transform(matrix);
+        pointsCacheDirty = true;
+        cachedPoints = null;
     }
 
     /**
@@ -104,7 +112,23 @@ public class IMGPath {
     public List<IMGPath> eraseNear(float x, float y, float radius) {
         List<IMGPath> result = new ArrayList<>();
         float[] points = approximatePathPoints();
-        if (points.length < 4) return result;
+
+        // 特殊处理：零长度路径（点）— approximatePathPoints 返回空数组
+        if (points.length < 2) {
+            android.graphics.RectF bounds = new android.graphics.RectF();
+            path.computeBounds(bounds, true);
+            // 使用边界框的左上角作为点的坐标（moveTo 的位置）
+            float dotX = bounds.left;
+            float dotY = bounds.top;
+            float dx = dotX - x;
+            float dy = dotY - y;
+            if (dx * dx + dy * dy <= radius * radius) {
+                return result;  // 点在擦除区域内 → 擦除（返回空列表）
+            } else {
+                result.add(this);
+                return result;  // 点在擦除区域外 → 保留（返回自身引用）
+            }
+        }
 
         // 标记每个点是否在擦除区域内
         boolean[] inside = new boolean[points.length / 2];
@@ -162,11 +186,19 @@ public class IMGPath {
     }
 
     private float[] approximatePathPoints() {
+        // 使用缓存避免重复计算
+        if (!pointsCacheDirty && cachedPoints != null) {
+            return cachedPoints;
+        }
         android.graphics.PathMeasure pm = new android.graphics.PathMeasure(path, false);
         List<Float> pts = new ArrayList<>();
         float[] pos = new float[2];
         float length = pm.getLength();
-        if (length <= 0) return new float[0];
+        if (length <= 0) {
+            cachedPoints = new float[0];
+            pointsCacheDirty = false;
+            return cachedPoints;
+        }
         float step = Math.max(2f, length / 100f);
         for (float d = 0; d <= length; d += step) {
             pm.getPosTan(d, pos, null);
@@ -182,6 +214,8 @@ public class IMGPath {
         for (int i = 0; i < pts.size(); i++) {
             result[i] = pts.get(i);
         }
+        cachedPoints = result;
+        pointsCacheDirty = false;
         return result;
     }
 

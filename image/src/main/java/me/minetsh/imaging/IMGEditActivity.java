@@ -40,6 +40,8 @@ public class IMGEditActivity extends IMGEditBaseActivity {
 
     private static final String TAG = "IMGEdit";
 
+    protected int mThemeColor = 0xFF1565C0; // 默认蓝色，可被 Intent extra 覆盖
+
     private android.widget.TextView mDialogText;
     private android.app.AlertDialog mCurrentDialog;
 
@@ -60,7 +62,7 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         layout.setMinimumWidth((int) (260 * getResources().getDisplayMetrics().density));
 
         android.widget.ProgressBar progress = new android.widget.ProgressBar(this);
-        progress.getIndeterminateDrawable().setColorFilter(0xFF1565C0, android.graphics.PorterDuff.Mode.SRC_IN);
+        progress.getIndeterminateDrawable().setColorFilter(mThemeColor, android.graphics.PorterDuff.Mode.SRC_IN);
         android.widget.LinearLayout.LayoutParams pp = new android.widget.LinearLayout.LayoutParams(
                 (int) (48 * getResources().getDisplayMetrics().density),
                 (int) (48 * getResources().getDisplayMetrics().density));
@@ -108,78 +110,99 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         final long showTime = System.currentTimeMillis();
 
         new Thread(() -> {
-            String doodleJson = null;
-            int undoCount = 0;
+            try {
+                String doodleJson = null;
+                int undoCount = 0;
 
-            if (filePath != null) {
-                java.io.File doodleFile = new java.io.File(filePath);
-                if (doodleFile.exists()) {
-                    try {
-                        byte[] bytes = new byte[(int) doodleFile.length()];
-                        java.io.FileInputStream fis = new java.io.FileInputStream(doodleFile);
-                        fis.read(bytes);
-                        fis.close();
-                        doodleJson = new String(bytes, "UTF-8");
-                    } catch (IOException e) {
-                        Log.e(TAG, "onCreated: failed to read doodle file", e);
-                    }
-                }
-            }
-            if (doodleJson == null) {
-                doodleJson = jsonFallback;
-            }
-
-            if (doodleJson != null && !doodleJson.isEmpty()) {
-                try {
-                    org.json.JSONObject root = new org.json.JSONObject(doodleJson);
-                    if (root.has("undo")) {
-                        undoCount = root.getJSONArray("undo").length();
-                    } else if (root.has("history")) {
-                        undoCount = root.getJSONArray("history").length();
-                    }
-                } catch (Exception ignored) {}
-            }
-
-            final String json = doodleJson;
-            final int count = undoCount;
-
-            runOnUiThread(() -> {
-                if (json != null && !json.isEmpty()) {
-                    mImgView.deserializeDoodles(json);
-                    // 恢复文字贴纸
-                    try {
-                        org.json.JSONObject root = new org.json.JSONObject(json);
-                        if (root.has("stickers")) {
-                            mImgView.deserializeStickers(root.getJSONArray("stickers"));
+                if (filePath != null) {
+                    java.io.File doodleFile = new java.io.File(filePath);
+                    if (doodleFile.exists()) {
+                        try {
+                            // 限制文件大小，防止OOM
+                            long fileLen = doodleFile.length();
+                            if (fileLen > 10 * 1024 * 1024) { // 10MB限制
+                                Log.e(TAG, "onCreated: doodle file too large: " + fileLen);
+                            } else {
+                                byte[] bytes = new byte[(int) fileLen];
+                                java.io.FileInputStream fis = new java.io.FileInputStream(doodleFile);
+                                fis.read(bytes);
+                                fis.close();
+                                doodleJson = new String(bytes, "UTF-8");
+                            }
+                        } catch (IOException e) {
+                            Log.e(TAG, "onCreated: failed to read doodle file", e);
+                        } catch (OutOfMemoryError e) {
+                            Log.e(TAG, "onCreated: OOM reading doodle file", e);
+                            System.gc();
                         }
-                    } catch (Exception e) {
-                        Log.e(TAG, "onCreated: failed to restore stickers", e);
-                    }
-                    mImgView.invalidate();
-                    if (!mImgView.isDoodleEmpty()) {
-                        Log.d(TAG, "onCreated: doodles found, switching to DOODLE mode");
-                        mImgView.post(() -> {
-                            mImgView.setMode(IMGMode.DOODLE);
-                            updateModeUI();
-                        });
-                    } else {
-                        Log.d(TAG, "onCreated: no doodles, staying in NONE mode");
                     }
                 }
-                updateDialogText("已恢复 " + count + " 条编辑记录");
+                if (doodleJson == null) {
+                    doodleJson = jsonFallback;
+                }
 
-                long elapsed = System.currentTimeMillis() - showTime;
-                long remaining = 2000 - elapsed;
-                if (remaining > 0) {
-                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                if (doodleJson != null && !doodleJson.isEmpty()) {
+                    try {
+                        org.json.JSONObject root = new org.json.JSONObject(doodleJson);
+                        if (root.has("undo")) {
+                            undoCount = root.getJSONArray("undo").length();
+                        } else if (root.has("history")) {
+                            undoCount = root.getJSONArray("history").length();
+                        }
+                    } catch (Exception ignored) {}
+                }
+
+                final String json = doodleJson;
+                final int count = undoCount;
+
+                runOnUiThread(() -> {
+                    try {
+                        if (json != null && !json.isEmpty()) {
+                            mImgView.deserializeDoodles(json);
+                            // 恢复文字贴纸
+                            try {
+                                org.json.JSONObject root = new org.json.JSONObject(json);
+                                if (root.has("stickers")) {
+                                    mImgView.deserializeStickers(root.getJSONArray("stickers"));
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "onCreated: failed to restore stickers", e);
+                            }
+                            mImgView.invalidate();
+                            if (!mImgView.isDoodleEmpty()) {
+                                Log.d(TAG, "onCreated: doodles found, switching to DOODLE mode");
+                                mImgView.post(() -> {
+                                    mImgView.setMode(IMGMode.DOODLE);
+                                    updateModeUI();
+                                });
+                            } else {
+                                Log.d(TAG, "onCreated: no doodles, staying in NONE mode");
+                            }
+                        }
+                        updateDialogText("已恢复 " + count + " 条编辑记录");
+                    } catch (Exception e) {
+                        Log.e(TAG, "onCreated: error restoring state", e);
+                    }
+
+                    long elapsed = System.currentTimeMillis() - showTime;
+                    long remaining = 2000 - elapsed;
+                    if (remaining > 0) {
+                        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                            if (mCurrentDialog != null) mCurrentDialog.dismiss();
+                            dismissLoadingDialog();
+                        }, remaining);
+                    } else {
                         if (mCurrentDialog != null) mCurrentDialog.dismiss();
                         dismissLoadingDialog();
-                    }, remaining);
-                } else {
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "onCreated: unexpected error in background thread", e);
+                runOnUiThread(() -> {
                     if (mCurrentDialog != null) mCurrentDialog.dismiss();
                     dismissLoadingDialog();
-                }
-            });
+                });
+            }
         }).start();
     }
 
@@ -246,7 +269,21 @@ public class IMGEditActivity extends IMGEditBaseActivity {
 
         options.inJustDecodeBounds = false;
 
-        Bitmap bitmap = decoder.decode(options);
+        Bitmap bitmap = null;
+        try {
+            bitmap = decoder.decode(options);
+        } catch (OutOfMemoryError e) {
+            Log.e(TAG, "getBitmap OOM: " + path, e);
+            System.gc();
+            // 尝试使用更大的inSampleSize重试
+            options.inSampleSize = Math.max(options.inSampleSize, 2) * 2;
+            try {
+                bitmap = decoder.decode(options);
+            } catch (OutOfMemoryError e2) {
+                Log.e(TAG, "getBitmap OOM retry failed", e2);
+                return null;
+            }
+        }
         Log.d(TAG, "LOAD: bitmap=" + (bitmap == null ? "null" : bitmap.getWidth() + "x" + bitmap.getHeight() + " config=" + bitmap.getConfig())
             + ", path=" + path
             + ", file=" + imgFile.getName()
@@ -316,76 +353,95 @@ public class IMGEditActivity extends IMGEditBaseActivity {
         final String savePath = path;
         final String jsonPath = path + ".doodles.json";
         new Thread(() -> {
-            // 先将所有贴纸移到背景列表（包括前景中的贴纸）
-            mImgView.prepareForSaveStickers();
+            try {
+                // 先将所有贴纸移到背景列表（包括前景中的贴纸）
+                mImgView.prepareForSaveStickers();
 
-            // 序列化文字贴纸数据
-            org.json.JSONArray stickerArr = mImgView.serializeStickers();
-            boolean hasStickers = stickerArr.length() > 0;
+                // 序列化文字贴纸数据
+                org.json.JSONArray stickerArr = mImgView.serializeStickers();
+                boolean hasStickers = stickerArr.length() > 0;
 
-            // 保存含涂鸦+贴纸的JPEG到 savePath → 内容页显示用
-            Bitmap displayBitmap = mImgView.saveBitmap();
-            Log.d(TAG, "SAVE: displayBitmap=" + (displayBitmap != null ? displayBitmap.getWidth() + "x" + displayBitmap.getHeight() : "null")
-                + ", savePath=" + savePath);
-            if (displayBitmap == null) {
+                // 保存含涂鸦+贴纸的JPEG到 savePath → 内容页显示用
+                Bitmap displayBitmap = mImgView.saveBitmap();
+                Log.d(TAG, "SAVE: displayBitmap=" + (displayBitmap != null ? displayBitmap.getWidth() + "x" + displayBitmap.getHeight() : "null")
+                    + ", savePath=" + savePath);
+                if (displayBitmap == null) {
+                    runOnUiThread(() -> {
+                        if (mCurrentDialog != null) mCurrentDialog.dismiss();
+                        dismissLoadingDialog();
+                        setResult(RESULT_CANCELED);
+                        finish();
+                    });
+                    return;
+                }
+
+                FileOutputStream dfout = null;
+                try {
+                    dfout = new FileOutputStream(savePath);
+                    displayBitmap.compress(Bitmap.CompressFormat.JPEG, 95, dfout);
+                } catch (FileNotFoundException e) {
+                    Log.e(TAG, "onDoneClick: compress display failed", e);
+                } finally {
+                    if (dfout != null) { try { dfout.close(); } catch (IOException ignored) {} }
+                }
+                displayBitmap.recycle();
+
+                // 序列化涂鸦 + 贴纸到 JSON
+                String doodleJson = mImgView.serializeDoodles();
+                try {
+                    org.json.JSONObject root = new org.json.JSONObject(doodleJson);
+                    if (hasStickers) {
+                        root.put("stickers", stickerArr);
+                    }
+                    doodleJson = root.toString();
+                } catch (Exception e) {
+                    Log.e(TAG, "onDoneClick: failed to merge stickers", e);
+                }
+
+                java.io.FileWriter fw = null;
+                try {
+                    fw = new java.io.FileWriter(jsonPath);
+                    fw.write(doodleJson);
+                } catch (IOException e) {
+                    Log.e(TAG, "onDoneClick: failed to write doodle file", e);
+                } finally {
+                    if (fw != null) {
+                        try { fw.close(); } catch (IOException ignored) {}
+                    }
+                }
+
+                long elapsed = System.currentTimeMillis() - showTime;
+                long remaining = 3000 - elapsed;
+                if (remaining > 0) {
+                    try { Thread.sleep(remaining); } catch (InterruptedException ignored) {}
+                }
+
+                runOnUiThread(() -> {
+                    if (mCurrentDialog != null) mCurrentDialog.dismiss();
+                    dismissLoadingDialog();
+                    Intent resultIntent = new Intent();
+                    resultIntent.putExtra(EXTRA_DOODLE_FILE_PATH, jsonPath);
+                    setResult(RESULT_OK, resultIntent);
+                    finish();
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "onDoneClick: unexpected error in save thread", e);
                 runOnUiThread(() -> {
                     if (mCurrentDialog != null) mCurrentDialog.dismiss();
                     dismissLoadingDialog();
                     setResult(RESULT_CANCELED);
                     finish();
                 });
-                return;
+            } catch (OutOfMemoryError e) {
+                Log.e(TAG, "onDoneClick: OOM in save thread", e);
+                System.gc();
+                runOnUiThread(() -> {
+                    if (mCurrentDialog != null) mCurrentDialog.dismiss();
+                    dismissLoadingDialog();
+                    setResult(RESULT_CANCELED);
+                    finish();
+                });
             }
-
-            FileOutputStream dfout = null;
-            try {
-                dfout = new FileOutputStream(savePath);
-                displayBitmap.compress(Bitmap.CompressFormat.JPEG, 95, dfout);
-            } catch (FileNotFoundException e) {
-                Log.e(TAG, "onDoneClick: compress display failed", e);
-            } finally {
-                if (dfout != null) { try { dfout.close(); } catch (IOException ignored) {} }
-            }
-            displayBitmap.recycle();
-
-            // 序列化涂鸦 + 贴纸到 JSON
-            String doodleJson = mImgView.serializeDoodles();
-            try {
-                org.json.JSONObject root = new org.json.JSONObject(doodleJson);
-                if (hasStickers) {
-                    root.put("stickers", stickerArr);
-                }
-                doodleJson = root.toString();
-            } catch (Exception e) {
-                Log.e(TAG, "onDoneClick: failed to merge stickers", e);
-            }
-
-            java.io.FileWriter fw = null;
-            try {
-                fw = new java.io.FileWriter(jsonPath);
-                fw.write(doodleJson);
-            } catch (IOException e) {
-                Log.e(TAG, "onDoneClick: failed to write doodle file", e);
-            } finally {
-                if (fw != null) {
-                    try { fw.close(); } catch (IOException ignored) {}
-                }
-            }
-
-            long elapsed = System.currentTimeMillis() - showTime;
-            long remaining = 3000 - elapsed;
-            if (remaining > 0) {
-                try { Thread.sleep(remaining); } catch (InterruptedException ignored) {}
-            }
-
-            runOnUiThread(() -> {
-                if (mCurrentDialog != null) mCurrentDialog.dismiss();
-                dismissLoadingDialog();
-                Intent resultIntent = new Intent();
-                resultIntent.putExtra(EXTRA_DOODLE_FILE_PATH, jsonPath);
-                setResult(RESULT_OK, resultIntent);
-                finish();
-            });
         }).start();
     }
 
