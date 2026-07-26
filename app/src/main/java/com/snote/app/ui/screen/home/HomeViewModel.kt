@@ -62,12 +62,10 @@ class HomeViewModel @Inject constructor(
             _notebooks.value = repository.getAllNotebooks()
             _isLoading.value = false
 
-            // 数据为空时自动扫描孤儿目录，尝试恢复
-            if (_notebooks.value.isEmpty()) {
-                val recovered = repository.scanAndRecoverOrphanedData()
-                if (recovered > 0) {
-                    _notebooks.value = repository.getAllNotebooks()
-                }
+            // 每次启动都扫描孤儿目录，尝试恢复被覆盖 JSON 的旧数据
+            val recovered = repository.scanAndRecoverOrphanedData()
+            if (recovered > 0) {
+                _notebooks.value = repository.getAllNotebooks()
             }
 
             // 检测是否需要存储权限
@@ -90,6 +88,7 @@ class HomeViewModel @Inject constructor(
                 repository.mergeAndSwitchToExternal()
                 repository.reinitialize()
                 repository.initializeDataDir()
+                repository.scanAndRecoverOrphanedData()
                 _notebooks.value = repository.getAllNotebooks()
                 _showStoragePermissionDialog.value = false
             }
