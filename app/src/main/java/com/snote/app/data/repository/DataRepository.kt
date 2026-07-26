@@ -148,30 +148,22 @@ class DataRepository @Inject constructor(
     }
 
     /**
-     * 扫描文件系统，找出 JSON 中未引用的孤儿目录，重建恢复笔记本。
-     * 用于恢复被覆盖 JSON 索引但文件仍在磁盘上的旧数据。
+     * 扫描文件系统所有目录，恢复 JSON 中丢失或内容为空的笔记本。
+     * 不管 JSON 里有没有引用，只要目录下有媒体文件就恢复。
      *
-     * @return 恢复的笔记本数量
+     * @return 恢复/补全的笔记本数量
      */
     suspend fun scanAndRecoverOrphanedData(): Int = withContext(Dispatchers.IO) {
-        // 找出 JSON 中已存在的 notebook ID
-        val existingIds = data.notebooks.map { it.id }.toSet()
+        val existingNotebooks = data.notebooks.toMutableList()
+        var changed = false
 
-        // 扫描 dataDir 子目录，跳过 covers
-        val orphanDirs = (dataDir.listFiles() ?: emptyArray()).filter { it.isDirectory && it.name != "covers" && it.name !in existingIds }
+        // 扫描 dataDir 所有子目录（跳过 covers）
+        val allDirs = (dataDir.listFiles() ?: emptyArray()).filter { it.isDirectory && it.name != "covers" }
+        val existingIds = existingNotebooks.map { it.id }.toSet()
 
-        if (orphanDirs.isEmpty()) {
-            Log.d(TAG, "没有发现孤儿数据目录")
-            return@withContext 0
-        }
-
-        val recoveredNotebooks = mutableListOf<Notebook>()
-
-        for (dir in orphanDirs) {
+        for (dir in allDirs) {
             val notebookId = dir.name
             val items = mutableListOf<ContentItem>()
-
-            // 扫描各类型子目录
             scanMediaDir(dir, "images", ContentType.IMAGE, items)
             scanMediaDir(dir, "videos", ContentType.VIDEO, items)
             scanMediaDir(dir, "audio", ContentType.AUDIO, items)
@@ -179,31 +171,44 @@ class DataRepository @Inject constructor(
 
             if (items.isEmpty()) continue
 
-            val chapter = Chapter(
-                title = "已恢复内容",
-                level = 1,
-                order = 0,
-                items = items.mapIndexed { idx, item -> item.copy(order = idx) }
-            )
-
-            val notebook = Notebook(
-                id = notebookId,
-                title = "已恢复笔记本 ($notebookId)",
-                description = "从文件系统恢复，原标题已丢失",
-                chapters = listOf(chapter)
-            )
-
-            recoveredNotebooks.add(notebook)
-            Log.d(TAG, "恢复笔记本: $notebookId, 内容数: ${items.size}")
+            val existingNotebook = existingNotebooks.find { it.id == notebookId }
+            if (existingNotebook != null) {
+                // JSON 里有这个笔记本但内容可能是空的 → 补全
+                if (existingNotebook.chapters.isEmpty() || existingNotebook.chapters.all { it.items.isEmpty() }) {
+                    val chapter = Chapter(
+                        title = "已恢复内容", level = 1, order = 0,
+                        items = items.mapIndexed { idx, item -> item.copy(order = idx) }
+                    )
+                    val restored = existingNotebook.copy(chapters = listOf(chapter))
+                    val idx = existingNotebooks.indexOfFirst { it.id == notebookId }
+                    if (idx >= 0) existingNotebooks[idx] = restored
+                    changed = true
+                    Log.d(TAG, "补全已有笔记本: $notebookId, 文件数: ${items.size}")
+                }
+            } else {
+                // JSON 里没有 → 新建恢复笔记本
+                val chapter = Chapter(
+                    title = "已恢复内容", level = 1, order = 0,
+                    items = items.mapIndexed { idx, item -> item.copy(order = idx) }
+                )
+                val notebook = Notebook(
+                    id = notebookId,
+                    title = "已恢复笔记本 ($notebookId)",
+                    description = "从文件系统恢复，原标题已丢失",
+                    chapters = listOf(chapter)
+                )
+                existingNotebooks.add(notebook)
+                changed = true
+                Log.d(TAG, "新建恢复笔记本: $notebookId, 文件数: ${items.size}")
+            }
         }
 
-        if (recoveredNotebooks.isEmpty()) return@withContext 0
+        if (!changed) return@withContext 0
 
-        // 合并恢复数据
-        data = data.copy(notebooks = data.notebooks + recoveredNotebooks)
+        data = data.copy(notebooks = existingNotebooks)
         save()
-        Log.d(TAG, "共恢复 ${recoveredNotebooks.size} 个笔记本")
-        recoveredNotebooks.size
+        Log.d(TAG, "恢复完成, 总笔记本数: ${existingNotebooks.size}")
+        existingNotebooks.size - existingIds.size + (if (changed) 1 else 0) // approximate
     }
 
     /** 扫描指定媒体目录，将文件转为 ContentItem */
