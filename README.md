@@ -1,5 +1,12 @@
 # 📖 Snote — 为学习打造的多媒体整理工具
 
+<p align="center">
+  <img src="https://img.shields.io/badge/version-3.2.1-blue" alt="version">
+  <img src="https://img.shields.io/badge/Android-8.0+-green" alt="minSdk">
+  <img src="https://img.shields.io/badge/Compose-Material%203-purple" alt="Compose">
+  <img src="https://img.shields.io/badge/Kotlin-2.1.20-red" alt="Kotlin">
+</p>
+
 > 一款极轻量的学习笔记应用。将图片、视频、音频、文件按笔记本与章节层级规整收纳，配合涂鸦编辑、内容重命名、物理动画，打造结构化的电子书式阅读体验。
 
 ---
@@ -33,6 +40,20 @@
 - **隐私安全** — 无需网络权限，所有数据全程保存在本地
 
 > 系统会请求「所有文件访问」权限用于读写 `Documents/Snote/` 目录；不授予权限仍可正常使用，但卸载后数据将无法恢复。麦克风权限仅在录音时使用。
+
+---
+
+## 🛠 技术栈
+
+| 类别 | 技术 |
+|------|------|
+| 语言 | Kotlin |
+| UI | Jetpack Compose + Material 3 |
+| 架构 | MVVM + Repository |
+| 依赖注入 | Hilt（Dagger） |
+| 图片加载 | Coil |
+| JSON 解析 | Gson |
+| 数据存储 | DataStore Preferences |
 
 ---
 
