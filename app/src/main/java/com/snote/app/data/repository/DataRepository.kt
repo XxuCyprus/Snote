@@ -148,6 +148,81 @@ class DataRepository @Inject constructor(
     }
 
     /**
+     * 扫描文件系统，找出 JSON 中未引用的孤儿目录，重建恢复笔记本。
+     * 用于恢复被覆盖 JSON 索引但文件仍在磁盘上的旧数据。
+     *
+     * @return 恢复的笔记本数量
+     */
+    suspend fun scanAndRecoverOrphanedData(): Int = withContext(Dispatchers.IO) {
+        // 找出 JSON 中已存在的 notebook ID
+        val existingIds = data.notebooks.map { it.id }.toSet()
+
+        // 扫描 dataDir 子目录，跳过 covers
+        val orphanDirs = (dataDir.listFiles() ?: emptyArray()).filter { it.isDirectory && it.name != "covers" && it.name !in existingIds }
+
+        if (orphanDirs.isEmpty()) {
+            Log.d(TAG, "没有发现孤儿数据目录")
+            return@withContext 0
+        }
+
+        val recoveredNotebooks = mutableListOf<Notebook>()
+
+        for (dir in orphanDirs) {
+            val notebookId = dir.name
+            val items = mutableListOf<ContentItem>()
+
+            // 扫描各类型子目录
+            scanMediaDir(dir, "images", ContentType.IMAGE, items)
+            scanMediaDir(dir, "videos", ContentType.VIDEO, items)
+            scanMediaDir(dir, "audio", ContentType.AUDIO, items)
+            scanMediaDir(dir, "files", ContentType.FILE, items)
+
+            if (items.isEmpty()) continue
+
+            val chapter = Chapter(
+                title = "已恢复内容",
+                level = 1,
+                order = 0,
+                items = items.mapIndexed { idx, item -> item.copy(order = idx) }
+            )
+
+            val notebook = Notebook(
+                id = notebookId,
+                title = "已恢复笔记本 ($notebookId)",
+                description = "从文件系统恢复，原标题已丢失",
+                chapters = listOf(chapter)
+            )
+
+            recoveredNotebooks.add(notebook)
+            Log.d(TAG, "恢复笔记本: $notebookId, 内容数: ${items.size}")
+        }
+
+        if (recoveredNotebooks.isEmpty()) return@withContext 0
+
+        // 合并恢复数据
+        data = data.copy(notebooks = data.notebooks + recoveredNotebooks)
+        save()
+        Log.d(TAG, "共恢复 ${recoveredNotebooks.size} 个笔记本")
+        recoveredNotebooks.size
+    }
+
+    /** 扫描指定媒体目录，将文件转为 ContentItem */
+    private fun scanMediaDir(
+        notebookDir: File, subDirName: String, type: ContentType, items: MutableList<ContentItem>
+    ) {
+        val subDir = File(notebookDir, subDirName)
+        if (!subDir.exists() || !subDir.isDirectory) return
+
+        val files = subDir.listFiles()?.sortedBy { it.lastModified() } ?: return
+        for (file in files) {
+            if (file.isFile) {
+                val relativePath = file.absolutePath.removePrefix("${dataDir.absolutePath}/")
+                items.add(ContentItem(type = type, content = relativePath, order = items.size))
+            }
+        }
+    }
+
+    /**
      * 获取数据目录路径（用于设置页面显示）
      */
     fun getDataDirPath(): String = dataDir.absolutePath

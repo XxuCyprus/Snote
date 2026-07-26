@@ -62,6 +62,14 @@ class HomeViewModel @Inject constructor(
             _notebooks.value = repository.getAllNotebooks()
             _isLoading.value = false
 
+            // 数据为空时自动扫描孤儿目录，尝试恢复
+            if (_notebooks.value.isEmpty()) {
+                val recovered = repository.scanAndRecoverOrphanedData()
+                if (recovered > 0) {
+                    _notebooks.value = repository.getAllNotebooks()
+                }
+            }
+
             // 检测是否需要存储权限
             if (needsStoragePermission()) {
                 _showStoragePermissionDialog.value = true
