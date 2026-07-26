@@ -615,6 +615,53 @@ class DataRepository @Inject constructor(
     }
 
     /**
+     * 重命名 VIDEO / AUDIO / FILE 内容条目（重命名磁盘文件 + 更新路径）
+     */
+    suspend fun renameContentFile(
+        notebookId: String, chapterId: String, itemId: String, newName: String
+    ) = withContext(Dispatchers.IO) {
+        val chapter = findChapterInNotebook(notebookId, chapterId) ?: return@withContext
+        val item = chapter.items.find { it.id == itemId } ?: return@withContext
+
+        if (item.type != ContentType.VIDEO && item.type != ContentType.AUDIO && item.type != ContentType.FILE) return@withContext
+
+        val oldRelativePath = item.content
+        val oldFile = File(dataDir, oldRelativePath)
+        if (!oldFile.exists()) return@withContext
+
+        val parentDir = oldFile.parentFile ?: return@withContext
+        val extension = oldFile.extension
+        val extWithDot = if (extension.isNotEmpty()) ".$extension" else ""
+
+        val sanitized = newName.replace(Regex("""[/\\:*?"<>|]"""), "_").trim()
+        if (sanitized.isEmpty()) return@withContext
+
+        var newFile = File(parentDir, "$sanitized$extWithDot")
+
+        if (newFile.exists() && newFile.absolutePath != oldFile.absolutePath) {
+            var counter = 1
+            while (true) {
+                newFile = File(parentDir, "$sanitized($counter)$extWithDot")
+                if (!newFile.exists()) break
+                counter++
+            }
+        }
+
+        oldFile.renameTo(newFile)
+
+        val newRelativePath = newFile.absolutePath.removePrefix("${dataDir.absolutePath}/")
+
+        withNotebook(notebookId) { nb ->
+            nb.withChapter(chapterId) { ch ->
+                ch.copy(items = ch.items.map {
+                    if (it.id == itemId) it.copy(content = newRelativePath) else it
+                })
+            }
+        }
+        save()
+    }
+
+    /**
      * 切换内容条目标记
      */
     suspend fun toggleContentMarked(notebookId: String, chapterId: String, itemId: String) = withContext(Dispatchers.IO) {

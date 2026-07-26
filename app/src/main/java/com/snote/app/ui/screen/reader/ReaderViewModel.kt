@@ -349,6 +349,14 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    fun renameContentItem(itemId: String, newName: String) {
+        val chapterId = _currentChapter.value?.id ?: return
+        viewModelScope.launch {
+            repository.renameContentFile(notebookId, chapterId, itemId, newName)
+            refreshAfterContentChange(chapterId)
+        }
+    }
+
     fun updateImageContent(itemId: String, newPath: String) {
         val chapterId = _currentChapter.value?.id ?: return
         viewModelScope.launch {

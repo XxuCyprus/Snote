@@ -106,6 +106,10 @@ fun ReaderScreen(
     // 文字编辑状态
     var editingTextItem by remember { mutableStateOf<ContentItem?>(null) }
 
+    // 媒体/文件重命名状态
+    var renamingContentItemId by remember { mutableStateOf<String?>(null) }
+    var renamingContentFileName by remember { mutableStateOf("") }
+
     // 图片编辑器 Activity 启动器
     var pendingEditSavePath by remember { mutableStateOf<String?>(null) }
     var pendingEditItemId by remember { mutableStateOf<String?>(null) }
@@ -185,6 +189,16 @@ fun ReaderScreen(
             renameAnimProgress.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 350f))
         } else {
             renameAnimProgress.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 500f))
+        }
+    }
+
+    // 媒体/文件重命名 动画进度
+    val renameContentAnimProgress = remember { Animatable(0f) }
+    LaunchedEffect(renamingContentItemId) {
+        if (renamingContentItemId != null) {
+            renameContentAnimProgress.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 350f))
+        } else {
+            renameContentAnimProgress.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 500f))
         }
     }
 
@@ -373,7 +387,16 @@ fun ReaderScreen(
                         getAbsolutePath = { rel -> viewModel.getAbsolutePath(rel) },
                         onDelete = { deleteTargetId = it },
                         onEdit = { id ->
-                            editingTextItem = currentChapter?.items?.find { ci -> ci.id == id }
+                            val item = currentChapter?.items?.find { ci -> ci.id == id }
+                            if (item != null) {
+                                when (item.type) {
+                                    ContentType.TEXT -> editingTextItem = item
+                                    else -> {
+                                        renamingContentItemId = item.id
+                                        renamingContentFileName = File(item.content).nameWithoutExtension
+                                    }
+                                }
+                            }
                         },
                         onToggleMark = { viewModel.toggleContentMarked(it) },
                         onSwapUp = { id1, id2 -> viewModel.swapContentItems(id1, id2) },
@@ -430,7 +453,11 @@ fun ReaderScreen(
                                 }
                             }
                         },
-                        onFileClick = { path -> fileTargetPath = path }
+                        onFileClick = { path -> fileTargetPath = path },
+                        onRenameContent = { path, itemId ->
+                            renamingContentItemId = itemId
+                            renamingContentFileName = File(path).nameWithoutExtension
+                        }
                     )
                 }
                 LaunchedEffect(sortedItems) {
@@ -817,7 +844,7 @@ fun ReaderScreen(
     }
 
     // BackHandler 放在所有 overlay 之后，确保最高优先级
-    val anyDialogOpen = showDrawer || showAddChapterDialog || showAddContentDialog || showRecorderDialog || editingTextItem != null || renamingChapterId != null || deleteTargetId != null || deleteChapterTarget != null
+    val anyDialogOpen = showDrawer || showAddChapterDialog || showAddContentDialog || showRecorderDialog || editingTextItem != null || renamingChapterId != null || renamingContentItemId != null || deleteTargetId != null || deleteChapterTarget != null
     BackHandler(enabled = anyDialogOpen) {
         when {
             showAddChapterDialog -> viewModel.hideAddChapterDialog()
@@ -825,6 +852,7 @@ fun ReaderScreen(
             showRecorderDialog -> if (!isRecording && !recordingCompleted) viewModel.cancelRecording()
             editingTextItem != null -> editingTextItem = null
             renamingChapterId != null -> renamingChapterId = null
+            renamingContentItemId != null -> renamingContentItemId = null
             deleteTargetId != null -> deleteTargetId = null
             deleteChapterTarget != null -> deleteChapterTarget = null
             showDrawer -> viewModel.closeDrawer()
@@ -917,6 +945,7 @@ fun ReaderScreen(
                     EditTextDialogContent(
                         initialText = currentTitle,
                         themeColor = viewModel.themeColor,
+                        title = "重命名章节",
                         onDismiss = { renamingChapterId = null },
                         onSave = { newTitle ->
                             val cid = renamingChapterId
@@ -924,6 +953,51 @@ fun ReaderScreen(
                                 viewModel.renameChapter(cid, newTitle.trim())
                             }
                             renamingChapterId = null
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    // 内容条目重命名弹窗（视频/音频/文件）
+    val rcv = renameContentAnimProgress.value
+    if (renamingContentItemId != null || rcv > 0.01f) {
+        Box(Modifier.fillMaxSize()) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = rcv * 0.5f }
+                    .background(Color.Black)
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() },
+                        onClick = { renamingContentItemId = null }
+                    )
+            )
+            Box(
+                Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    Modifier.graphicsLayer {
+                        alpha = rcv
+                        val s = 0.85f + 0.15f * rcv
+                        scaleX = s
+                        scaleY = s
+                    }
+                ) {
+                    EditTextDialogContent(
+                        initialText = renamingContentFileName,
+                        themeColor = viewModel.themeColor,
+                        title = "重命名",
+                        onDismiss = { renamingContentItemId = null },
+                        onSave = { newName ->
+                            val id = renamingContentItemId
+                            if (id != null && newName.isNotBlank()) {
+                                viewModel.renameContentItem(id, newName.trim())
+                            }
+                            renamingContentItemId = null
                         }
                     )
                 }
@@ -2062,6 +2136,7 @@ private fun RecordInProgressContent(pulseScale: Float, timeText: String) {
 fun EditTextDialogContent(
     initialText: String,
     themeColor: Color,
+    title: String = "编辑文字",
     onDismiss: () -> Unit,
     onSave: (String) -> Unit
 ) {
@@ -2087,7 +2162,7 @@ fun EditTextDialogContent(
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                "编辑文字",
+                title,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.align(Alignment.CenterHorizontally)

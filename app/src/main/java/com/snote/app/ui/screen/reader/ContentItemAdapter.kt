@@ -32,7 +32,8 @@ class ContentItemAdapter(
     private val onVideoClick: (String) -> Unit,
     private val onImageEdit: (String, String) -> Unit,
     private val onSaveToGallery: (String) -> Unit,
-    private val onFileClick: (String) -> Unit
+    private val onFileClick: (String) -> Unit,
+    private val onRenameContent: (String, String) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     init {
@@ -222,6 +223,7 @@ class ContentItemAdapter(
                     tvText.isClickable = true
                     tvText.isFocusable = true
                     tvText.setOnClickListener { onEdit(item.id) }
+                    btnEdit.visibility = View.VISIBLE
                 }
                 ContentType.IMAGE -> {
                     imgContent.visibility = View.VISIBLE
@@ -259,6 +261,7 @@ class ContentItemAdapter(
                     }
                     btnPlayVideo.background = videoBg
                     videoArea.setOnClickListener { onVideoClick(getAbsolutePath(item.content)) }
+                    btnEdit.visibility = View.VISIBLE
                 }
                 ContentType.AUDIO -> {
                     audioArea.visibility = View.VISIBLE
@@ -269,6 +272,7 @@ class ContentItemAdapter(
                     }
                     btnPlayAudio.background = audioBg
                     bindAudioPlayback(item)
+                    btnEdit.visibility = View.VISIBLE
                 }
                 ContentType.FILE -> {
                     fileArea.visibility = View.VISIBLE
@@ -276,6 +280,7 @@ class ContentItemAdapter(
                     fileArea.isClickable = true
                     fileArea.isFocusable = true
                     fileArea.setOnClickListener { onFileClick(getAbsolutePath(item.content)) }
+                    btnEdit.visibility = View.VISIBLE
                 }
             }
 
@@ -307,10 +312,10 @@ class ContentItemAdapter(
             // Edit / Delete / Save
             btnDelete.setOnClickListener { onDelete(item.id) }
             btnEdit.setOnClickListener {
-                if (item.type == ContentType.IMAGE) {
-                    onImageEdit(getAbsolutePath(item.content), item.id)
-                } else {
-                    onEdit(item.id)
+                when (item.type) {
+                    ContentType.IMAGE -> onImageEdit(getAbsolutePath(item.content), item.id)
+                    ContentType.TEXT -> onEdit(item.id)
+                    else -> onRenameContent(getAbsolutePath(item.content), item.id)
                 }
             }
             btnSaveToGallery.setOnClickListener {
