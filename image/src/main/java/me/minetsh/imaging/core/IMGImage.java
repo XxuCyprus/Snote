@@ -112,6 +112,9 @@ public class IMGImage {
      * 线性历史：每个元素是一次操作前的完整 mDoodles 快照
      */
     private List<List<IMGPath>> mHistory = new ArrayList<>();
+    {
+        mHistory.add(new ArrayList<>()); // 种子：空状态，保证撤回到最初的空白
+    }
 
     /**
      * 当前状态在历史中的位置（mDoodles 对应 mHistory[mHistoryIndex]）
@@ -857,10 +860,8 @@ public class IMGImage {
             case DOODLE:
                 pushHistory();
                 mDoodles.add(path);
-                // 保存添加后的状态为新条目（不覆盖pushHistory刚保存的快照）
-                mHistory.add(new ArrayList<>(mDoodles));
-                mUndoOps.add(null);
-                mHistoryIndex = mHistory.size() - 1;
+                // 更新历史条目为添加后的状态（确保序列化时历史与当前一致）
+                mHistory.set(mHistoryIndex, new ArrayList<>(mDoodles));
                 invalidateDoodlesCache();
                 break;
         }
