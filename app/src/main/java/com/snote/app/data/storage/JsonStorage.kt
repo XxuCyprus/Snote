@@ -15,27 +15,27 @@ class JsonStorage {
     private val dataFileName = "snote_data.json"
     private val TAG = "JsonStorage"
 
-    fun loadData(dataDir: File): SnoteData {
-        val dataFile = File(dataDir, dataFileName)
+    fun loadData(dataDir: File, fileName: String = dataFileName): SnoteData {
+        val dataFile = File(dataDir, fileName)
         Log.d(TAG, "加载数据: ${dataFile.absolutePath}, 存在: ${dataFile.exists()}, 大小: ${dataFile.length()}")
         if (!dataFile.exists()) {
-            Log.d(TAG, "数据文件不存在，返回空数据")
+            Log.d(TAG, "数据文件($fileName)不存在，返回空数据")
             return SnoteData()
         }
         return try {
             InputStreamReader(dataFile.inputStream(), Charsets.UTF_8).use { reader ->
                 val result = gson.fromJson(reader, SnoteData::class.java) ?: SnoteData()
-                Log.d(TAG, "加载成功, 笔记本数: ${result.notebooks.size}")
+                Log.d(TAG, "加载成功($fileName), 笔记本数: ${result.notebooks.size}")
                 result
             }
         } catch (e: Exception) {
-            Log.e(TAG, "JSON解析失败: ${e.message}", e)
+            Log.e(TAG, "JSON解析失败($fileName): ${e.message}", e)
             SnoteData()
         }
     }
 
-    fun saveData(dataDir: File, data: SnoteData): Boolean {
-        val dataFile = File(dataDir, dataFileName)
+    fun saveData(dataDir: File, data: SnoteData, fileName: String = dataFileName): Boolean {
+        val dataFile = File(dataDir, fileName)
         return try {
             val json = gson.toJson(data)
             dataFile.writeText(json, Charsets.UTF_8)

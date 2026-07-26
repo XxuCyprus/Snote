@@ -51,6 +51,7 @@ class HomeViewModel @Inject constructor(
     private var hadStoragePermission = false
 
     init {
+        hadStoragePermission = repository.hasFullStorageAccess()
         loadData()
     }
 
@@ -60,8 +61,6 @@ class HomeViewModel @Inject constructor(
             repository.initializeDataDir()
             _notebooks.value = repository.getAllNotebooks()
             _isLoading.value = false
-
-            hadStoragePermission = repository.hasFullStorageAccess()
 
             // 检测是否需要存储权限
             if (needsStoragePermission()) {
@@ -77,7 +76,7 @@ class HomeViewModel @Inject constructor(
     fun onAppResume() {
         val hasPerm = repository.hasFullStorageAccess()
         if (!hadStoragePermission && hasPerm) {
-            // 权限从无→有：迁移合并内部数据到外部，然后重新加载
+            // 权限从无→有：合并 pending 数据到主文件，重新加载
             hadStoragePermission = true
             viewModelScope.launch {
                 repository.mergeAndSwitchToExternal()
@@ -87,11 +86,8 @@ class HomeViewModel @Inject constructor(
                 _showStoragePermissionDialog.value = false
             }
         } else if (hadStoragePermission && !hasPerm) {
-            // 权限从有→无：快照当前数据到内部存储，然后提醒用户
+            // 权限从有→无：提醒用户
             hadStoragePermission = false
-            viewModelScope.launch {
-                repository.saveSnapshotToInternal()
-            }
             _showStoragePermissionDialog.value = true
         }
         hadStoragePermission = hasPerm
