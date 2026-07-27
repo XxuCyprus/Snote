@@ -96,7 +96,12 @@ Snote/
 
 ---
 
+## 📄 许可证
+
+本项目采用 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) 许可证。使用本项目的代码须遵守署名、非商业性使用、相同方式共享的条款。
+
+---
+
 <p align="center">
-  Made with ❤️ by <a href="https://github.com/XxuCyprus">Lnaaa</a><br>
-  <sub>本项目采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> 许可证</sub>
+  Made with ❤️ by <a href="https://github.com/XxuCyprus">Lnaaa</a>
 </p>
