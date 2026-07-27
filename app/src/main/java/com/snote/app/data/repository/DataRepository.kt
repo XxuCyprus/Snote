@@ -893,6 +893,23 @@ class DataRepository @Inject constructor(
                         )
                     )
                 }
+                // 对视频/音频/文件类型，按文件名搜索
+                if (item.type != ContentType.TEXT) {
+                    val fileName = java.io.File(item.content).name.lowercase()
+                    if (fileName.contains(lowerQuery)) {
+                        results.add(
+                            SearchResult(
+                                notebookId = notebook.id,
+                                notebookTitle = notebook.title,
+                                chapterId = chapter.id,
+                                chapterTitle = chapter.title,
+                                matchedText = java.io.File(item.content).name,
+                                matchType = "file",
+                                ancestorPath = ancestorTitles
+                            )
+                        )
+                    }
+                }
             }
 
             searchChapters(notebook, chapter.children, lowerQuery, results, path)

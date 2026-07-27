@@ -45,14 +45,14 @@ class FocusStatsViewModel @Inject constructor(
     }
 
     private val pieColors = listOf(
-        Color(0xFF1565C0), // 蓝
-        Color(0xFFE65100), // 橙
-        Color(0xFF2E7D32), // 绿
-        Color(0xFFC62828), // 红
-        Color(0xFF6A1B9A), // 紫
-        Color(0xFF00838F), // 青
-        Color(0xFFF9A825), // 黄
-        Color(0xFF4E342E), // 棕
+        Color(0xFF90CAF9), // 天空蓝
+        Color(0xFFA5D6A7), // 薄荷绿
+        Color(0xFFF48FB1), // 樱花粉
+        Color(0xFFFFE082), // 奶油黄
+        Color(0xFFCE93D8), // 薰衣草紫
+        Color(0xFF80DEEA), // 湖水青
+        Color(0xFFFFAB91), // 蜜桃橙
+        Color(0xFFBCAAA4), // 奶茶棕
     )
 
     init {
