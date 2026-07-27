@@ -158,7 +158,7 @@ class DataRepository @Inject constructor(
         var recoveredCount = 0
 
         // 扫描 dataDir 所有子目录（跳过 covers）
-        val allDirs = (dataDir.listFiles() ?: emptyArray()).filter { it.isDirectory && it.name != "covers" }
+        val allDirs = (dataDir.listFiles() ?: emptyArray()).filter { it.isDirectory && it.name != "covers" && it.name != "todos" }
         val existingIds = existingNotebooks.map { it.id }.toSet()
 
         for (dir in allDirs) {

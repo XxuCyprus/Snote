@@ -45,14 +45,14 @@ class FocusStatsViewModel @Inject constructor(
     }
 
     private val pieColors = listOf(
-        Color(0xFF90CAF9), // 天空蓝
-        Color(0xFFA5D6A7), // 薄荷绿
-        Color(0xFFF48FB1), // 樱花粉
-        Color(0xFFFFE082), // 奶油黄
-        Color(0xFFCE93D8), // 薰衣草紫
-        Color(0xFF80DEEA), // 湖水青
-        Color(0xFFFFAB91), // 蜜桃橙
-        Color(0xFFBCAAA4), // 奶茶棕
+        Color(0xFF64B5F6), // 天蓝
+        Color(0xFF81C784), // 薄荷绿
+        Color(0xFFF06292), // 樱花粉
+        Color(0xFFFFD54F), // 奶油黄
+        Color(0xFFBA68C8), // 薰衣草紫
+        Color(0xFF4DD0E1), // 湖水青
+        Color(0xFFFF8A65), // 蜜桃橙
+        Color(0xFFA1887F), // 奶茶棕
     )
 
     init {
@@ -104,7 +104,7 @@ class FocusStatsViewModel @Inject constructor(
                 val label = if (notebookId == "__others__") "其他"
                     else dataRepository.getNotebookById(notebookId)?.title ?: notebookId.take(8)
                 val sweepAngle = if (total > 0) (duration / total * 360f) else 0f
-                val color = if (notebookId == "__others__") Color(0xFF9E9E9E)
+                val color = if (notebookId == "__others__") Color(0xFFA1887F)
                     else {
                         val idx = kotlin.math.abs(notebookId.hashCode()) % pieColors.size
                         pieColors[idx]

@@ -251,31 +251,24 @@ private fun AddCountdownDialogContent(
         }
     }
 
-    // DatePicker overlay
+    // DatePicker dialog
     if (showDatePicker) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)).clickable { showDatePicker = false })
-        val dateAnim = remember { Animatable(0f) }
-        LaunchedEffect(Unit) { dateAnim.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = 450f)) }
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Surface(
-                modifier = Modifier.graphicsLayer { alpha = dateAnim.value; val s = 0.85f + 0.15f * dateAnim.value; scaleX = s; scaleY = s },
-                shape = RoundedCornerShape(20.dp), color = Color.White, tonalElevation = 0.dp
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    DatePicker(state = datePickerState)
-                    Row(modifier = Modifier.fillMaxWidth().padding(end = 8.dp, bottom = 8.dp), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { showDatePicker = false }) { Text("取消") }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        TextButton(onClick = {
-                            datePickerState.selectedDateMillis?.let { millis ->
-                                val localDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
-                                selectedDateMs = localDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                            }
-                            showDatePicker = false
-                        }) { Text("确定") }
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val localDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+                        selectedDateMs = localDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
                     }
-                }
+                    showDatePicker = false
+                }) { Text("确定") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("取消") }
             }
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
 }

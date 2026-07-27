@@ -227,6 +227,13 @@ class TodoContentViewModel @Inject constructor(
         }
     }
 
+    fun updateImageContent(itemId: String, newPath: String) {
+        viewModelScope.launch {
+            todoRepository.updateImageContent(itemId, newPath)
+            refreshItems()
+        }
+    }
+
     fun getAbsolutePath(relativePath: String): String {
         return "${todoRepository.getDataDirPath()}/$relativePath"
     }

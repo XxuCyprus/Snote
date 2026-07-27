@@ -158,6 +158,14 @@ class TodoRepository @Inject constructor(
         save()
     }
 
+    suspend fun updateImageContent(itemId: String, newPath: String) = withContext(Dispatchers.IO) {
+        board = board.copy(
+            unfinished = board.unfinished.map { if (it.id == itemId) it.copy(content = newPath) else it },
+            finished = board.finished.map { if (it.id == itemId) it.copy(content = newPath) else it }
+        )
+        save()
+    }
+
     suspend fun swapTodoItems(itemId1: String, itemId2: String) = withContext(Dispatchers.IO) {
         // Try to find items in unfinished first, then finished
         val idx1_u = board.unfinished.indexOfFirst { it.id == itemId1 }

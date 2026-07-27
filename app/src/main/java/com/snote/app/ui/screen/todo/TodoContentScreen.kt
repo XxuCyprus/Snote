@@ -51,6 +51,7 @@ import com.snote.app.data.model.ContentItem
 import com.snote.app.data.model.ContentType
 import com.snote.app.ui.screen.reader.AddContentDialog
 import com.snote.app.ui.screen.reader.AudioRecorderDialogContent
+import com.snote.app.ui.screen.reader.EditTextDialogContent
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.flow.first
@@ -105,7 +106,13 @@ fun TodoContentScreen(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == android.app.Activity.RESULT_OK) {
-            pendingEditItemId?.let { /* image edited, save handled by IMGEditActivity */ }
+            val savedPath = pendingEditSavePath
+            val itemId = pendingEditItemId
+            if (savedPath != null && itemId != null) {
+                val dataDirPath = viewModel.getAbsolutePath("").removeSuffix("/")
+                val relativePath = savedPath.removePrefix("$dataDirPath/")
+                viewModel.updateImageContent(itemId, relativePath)
+            }
         }
         pendingEditSavePath = null
         pendingEditItemId = null
@@ -129,6 +136,19 @@ fun TodoContentScreen(
     var videoTargetPath by remember { mutableStateOf<String?>(null) }
     var fileTargetPath by remember { mutableStateOf<String?>(null) }
     var deleteTargetId by remember { mutableStateOf<String?>(null) }
+
+    // 文字编辑动画
+    val editAnimProgress = remember { Animatable(0f) }
+    LaunchedEffect(editingTextItem) {
+        if (editingTextItem != null) editAnimProgress.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 350f))
+        else editAnimProgress.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 500f))
+    }
+    // 重命名动画
+    val renameAnimProgress = remember { Animatable(0f) }
+    LaunchedEffect(renamingContentItemId) {
+        if (renamingContentItemId != null) renameAnimProgress.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 350f))
+        else renameAnimProgress.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 500f))
+    }
 
     val deleteAnimProgress = remember { Animatable(1f) }
     LaunchedEffect(deleteTargetId != null) {
@@ -375,31 +395,49 @@ fun TodoContentScreen(
     }
 
     // Text edit dialog
-    if (editingTextItem != null) {
-        TodoEditTextDialog(initialText = editingTextItem?.content ?: "", onDismiss = { editingTextItem = null }, onSave = { newText ->
-            val id = editingTextItem?.id ?: return@TodoEditTextDialog
-            viewModel.addTextContent(newText); viewModel.deleteItem(id); editingTextItem = null
-        })
+    val ev = editAnimProgress.value
+    if (editingTextItem != null || ev > 0.01f) {
+        Box(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize().graphicsLayer { alpha = ev * 0.5f }.background(Color.Black)
+                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { editingTextItem = null })
+            Box(Modifier.fillMaxSize(), Alignment.Center) {
+                Box(Modifier.graphicsLayer { alpha = ev; val s = 0.85f + 0.15f * ev; scaleX = s; scaleY = s }) {
+                    EditTextDialogContent(
+                        initialText = editingTextItem?.content ?: "",
+                        themeColor = themeColor,
+                        onDismiss = { editingTextItem = null },
+                        onSave = { newText ->
+                            val id = editingTextItem?.id ?: return@EditTextDialogContent
+                            viewModel.addTextContent(newText); viewModel.deleteItem(id); editingTextItem = null
+                        }
+                    )
+                }
+            }
+        }
     }
 
     // Rename dialog
-    if (renamingContentItemId != null) {
-        TodoEditTextDialog(title = "重命名", initialText = renamingContentFileName, onDismiss = { renamingContentItemId = null }, onSave = { newName ->
-            val id = renamingContentItemId ?: return@TodoEditTextDialog
-            if (newName.isNotBlank()) viewModel.renameTodoItem(id, newName.trim()); renamingContentItemId = null
-        })
+    val rv = renameAnimProgress.value
+    if (renamingContentItemId != null || rv > 0.01f) {
+        Box(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize().graphicsLayer { alpha = rv * 0.5f }.background(Color.Black)
+                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { renamingContentItemId = null })
+            Box(Modifier.fillMaxSize(), Alignment.Center) {
+                Box(Modifier.graphicsLayer { alpha = rv; val s = 0.85f + 0.15f * rv; scaleX = s; scaleY = s }) {
+                    EditTextDialogContent(
+                        initialText = renamingContentFileName,
+                        themeColor = themeColor,
+                        title = "重命名",
+                        onDismiss = { renamingContentItemId = null },
+                        onSave = { newName ->
+                            val id = renamingContentItemId ?: return@EditTextDialogContent
+                            if (newName.isNotBlank()) viewModel.renameTodoItem(id, newName.trim()); renamingContentItemId = null
+                        }
+                    )
+                }
+            }
+        }
     }
-}
-
-@Composable
-private fun TodoEditTextDialog(initialText: String, title: String = "编辑文字", onDismiss: () -> Unit, onSave: (String) -> Unit) {
-    var text by remember { mutableStateOf(initialText) }
-    AlertDialog(
-        onDismissRequest = onDismiss, title = { Text(title) },
-        text = { OutlinedTextField(value = text, onValueChange = { text = it }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), minLines = 3) },
-        confirmButton = { Button(onClick = { onSave(text.trim()) }, enabled = text.isNotBlank(), shape = RoundedCornerShape(12.dp)) { Text("保存") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
-    )
 }
 
 private fun saveBitmapToGallery(context: android.content.Context, bmp: Bitmap) {
