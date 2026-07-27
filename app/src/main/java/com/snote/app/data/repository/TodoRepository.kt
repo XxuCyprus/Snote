@@ -172,10 +172,19 @@ class TodoRepository @Inject constructor(
         )
         save()
 
-        // 保存成功后清理旧编辑版文件（先存JSON，后删文件，保证数据安全）
+        // 清理旧文件：与 Notes 模块逻辑一致
         val oldPath = oldItem?.content
         if (oldPath != null && oldPath != newPath) {
-            fileManager.deleteFile(dataDir, oldPath)
+            val oldFile = File(dataDir, oldPath)
+            val isOriginal = !oldFile.name.startsWith("edited_")
+            if (!isOriginal) {
+                // 旧文件是编辑版 → 删除编辑版及其伴生文件
+                fileManager.deleteFile(dataDir, oldPath)
+            } else {
+                // 旧文件是原图 → 只清理伴生文件，不删除原图
+                File(dataDir, "$oldPath.strokes").let { if (it.exists()) it.delete() }
+                File(dataDir, "$oldPath.base").let { if (it.exists()) it.delete() }
+            }
         }
     }
 
