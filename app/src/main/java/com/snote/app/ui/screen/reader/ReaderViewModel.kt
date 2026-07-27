@@ -11,22 +11,33 @@ import com.snote.app.data.model.Chapter
 import com.snote.app.data.model.ContentItem
 import com.snote.app.data.model.Notebook
 import com.snote.app.data.repository.DataRepository
+import com.snote.app.data.repository.StudyTimeRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import javax.inject.Inject
 
 @Stable
 @HiltViewModel
 class ReaderViewModel @Inject constructor(
     private val repository: DataRepository,
+    private val studyTimeRepository: StudyTimeRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val notebookId: String = savedStateHandle.get<String>("notebookId") ?: ""
     private val initialChapterId: String = savedStateHandle.get<String>("chapterId") ?: ""
+
+    // 学习计时
+    private var studyStartTime: Long = 0
+    private var accumulatedSeconds: Long = 0
+    private var studyJob: Job? = null
 
     // 主题色：与首页 NotebookAdapter 相同的确定性算法，从 notebookId 推导
     val themeColor: Color = run {
@@ -282,6 +293,58 @@ class ReaderViewModel @Inject constructor(
 
     init {
         loadData()
+        viewModelScope.launch {
+            studyTimeRepository.loadRecords()
+        }
+        startStudyTimer()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopStudyTimer()
+    }
+
+    private fun startStudyTimer() {
+        studyStartTime = System.currentTimeMillis()
+        studyJob = viewModelScope.launch {
+            while (isActive) {
+                delay(30_000)
+                flushStudyTime()
+            }
+        }
+    }
+
+    fun pauseStudyTimer() {
+        studyJob?.cancel()
+        studyJob = null
+        viewModelScope.launch { flushStudyTime() }
+    }
+
+    fun resumeStudyTimer() {
+        if (studyJob == null || studyJob?.isActive != true) {
+            startStudyTimer()
+        }
+    }
+
+    private fun stopStudyTimer() {
+        studyJob?.cancel()
+        studyJob = null
+        viewModelScope.launch {
+            flushStudyTime()
+        }
+    }
+
+    private suspend fun flushStudyTime() {
+        val now = System.currentTimeMillis()
+        val elapsed = (now - studyStartTime) / 1000
+        if (elapsed > 0) {
+            studyTimeRepository.addDuration(
+                notebookId = notebookId,
+                date = LocalDate.now().toString(),
+                seconds = elapsed
+            )
+            studyStartTime = now
+        }
     }
 
     private fun loadData() {

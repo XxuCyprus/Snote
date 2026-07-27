@@ -56,6 +56,9 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -99,6 +102,20 @@ fun ReaderScreen(
 
     val context = LocalContext.current
     val listState = rememberLazyListState()
+
+    // 监听前台/后台切换，暂停/恢复学习计时
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> viewModel.pauseStudyTimer()
+                Lifecycle.Event.ON_START -> viewModel.resumeStudyTimer()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     // 全屏图片查看状态
     var fullscreenImagePath by remember { mutableStateOf<String?>(null) }

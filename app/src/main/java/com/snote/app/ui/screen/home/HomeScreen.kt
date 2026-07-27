@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -61,6 +62,7 @@ fun HomeScreen(
     onNotebookClick: (notebookId: String, chapterId: String) -> Unit,
     onSettingsClick: () -> Unit,
     onSearchClick: () -> Unit = {},
+    onBackClick: (() -> Unit)? = null,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val notebooks by viewModel.notebooks.collectAsState()
@@ -132,12 +134,16 @@ fun HomeScreen(
                         fontWeight = FontWeight.Bold
                     )
                 },
+                navigationIcon = {
+                    if (onBackClick != null) {
+                        IconButton(onClick = onBackClick) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        }
+                    }
+                },
                 actions = {
                     IconButton(onClick = onSearchClick) {
                         Icon(Icons.Rounded.Search, contentDescription = "搜索")
-                    }
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Rounded.Settings, contentDescription = "设置")
                     }
                 }
             )
