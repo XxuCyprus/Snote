@@ -109,9 +109,11 @@ fun TodoContentScreen(
         if (result.resultCode == android.app.Activity.RESULT_OK) {
             val savedPath = pendingEditSavePath
             val itemId = pendingEditItemId
+            android.util.Log.d("TodoEdit", "launcher: savedPath=$savedPath, itemId=$itemId")
             if (savedPath != null && itemId != null) {
                 val dataDirPath = viewModel.getAbsolutePath("").removeSuffix("/")
                 val relativePath = savedPath.removePrefix("$dataDirPath/")
+                android.util.Log.d("TodoEdit", "dataDirPath=$dataDirPath, relativePath=$relativePath")
                 viewModel.updateImageContent(itemId, relativePath)
                 // 保存涂鸦数据 + 原图路径
                 val doodleFilePath = result.data?.getStringExtra(IMGEditActivity.EXTRA_DOODLE_FILE_PATH)

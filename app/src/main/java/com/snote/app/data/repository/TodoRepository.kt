@@ -166,6 +166,8 @@ class TodoRepository @Inject constructor(
         val oldItem = board.unfinished.find { it.id == itemId }
             ?: board.finished.find { it.id == itemId }
 
+        android.util.Log.d("TodoRepo", "updateImageContent: itemId=$itemId, newPath=$newPath, oldPath=${oldItem?.content}, dataDir=${dataDir.absolutePath}")
+
         board = board.copy(
             unfinished = board.unfinished.map { if (it.id == itemId) it.copy(content = newPath) else it },
             finished = board.finished.map { if (it.id == itemId) it.copy(content = newPath) else it }
@@ -177,14 +179,18 @@ class TodoRepository @Inject constructor(
         if (oldPath != null && oldPath != newPath) {
             val oldFile = File(dataDir, oldPath)
             val isOriginal = !oldFile.name.startsWith("edited_")
+            android.util.Log.d("TodoRepo", "cleanup: oldPath=$oldPath, oldFile=${oldFile.absolutePath}, exists=${oldFile.exists()}, isOriginal=$isOriginal")
             if (!isOriginal) {
                 // 旧文件是编辑版 → 删除编辑版及其伴生文件
-                fileManager.deleteFile(dataDir, oldPath)
+                val result = fileManager.deleteFile(dataDir, oldPath)
+                android.util.Log.d("TodoRepo", "delete edited file result: $result")
             } else {
                 // 旧文件是原图 → 只清理伴生文件，不删除原图
-                File(dataDir, "$oldPath.strokes").let { if (it.exists()) it.delete() }
-                File(dataDir, "$oldPath.base").let { if (it.exists()) it.delete() }
+                File(dataDir, "$oldPath.strokes").let { if (it.exists()) { it.delete(); android.util.Log.d("TodoRepo", "deleted $oldPath.strokes") } }
+                File(dataDir, "$oldPath.base").let { if (it.exists()) { it.delete(); android.util.Log.d("TodoRepo", "deleted $oldPath.base") } }
             }
+        } else if (oldPath == newPath) {
+            android.util.Log.w("TodoRepo", "oldPath == newPath, skip cleanup")
         }
     }
 
