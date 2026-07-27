@@ -97,5 +97,6 @@ Snote/
 ---
 
 <p align="center">
-  Made with ❤️ by <a href="https://github.com/XxuCyprus">Lnaaa</a>
+  Made with ❤️ by <a href="https://github.com/XxuCyprus">Lnaaa</a><br>
+  <sub>本项目采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> 许可证</sub>
 </p>
