@@ -96,6 +96,17 @@ class DataRepository @Inject constructor(
             Log.d(TAG, "创建目录结果: $created")
         }
 
+        // 优先加载主文件（即使无权限，先读入内存）
+        val mainFile = File(dataDir, "snote_data.json")
+        if (mainFile.exists() && mainFile.length() > 0) {
+            val mainData = jsonStorage.loadData(dataDir, "snote_data.json")
+            if (mainData.notebooks.isNotEmpty()) {
+                data = mainData
+                Log.d(TAG, "从主文件加载成功, 笔记本数: ${data.notebooks.size}")
+                return@withContext
+            }
+        }
+
         data = jsonStorage.loadData(dataDir, dataFileName)
         Log.d(TAG, "加载完成, 笔记本数: ${data.notebooks.size}")
     }
@@ -110,8 +121,9 @@ class DataRepository @Inject constructor(
         val mainFile = File(dataDir, "snote_data.json")
 
         if (!pendingFile.exists() || pendingFile.length() == 0L) {
-            // 没有 pending 文件，直接切回主文件名
+            // 没有 pending 文件，直接切回主文件名并加载主文件数据
             dataFileName = "snote_data.json"
+            data = jsonStorage.loadData(dataDir, "snote_data.json")
             isInitialized = false
             return@withContext
         }

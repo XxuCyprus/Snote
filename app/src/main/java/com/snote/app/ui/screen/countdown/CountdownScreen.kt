@@ -47,10 +47,11 @@ fun CountdownScreen(
 ) {
     val items by viewModel.items.collectAsState()
     val showAddDialog by viewModel.showAddDialog.collectAsState()
+    val editItem by viewModel.editDialogItem.collectAsState()
 
     LaunchedEffect(Unit) { viewModel.loadData() }
 
-    // FAB-origin animation
+    // FAB-origin animation for add dialog
     var fabBounds by remember { mutableStateOf(Rect.Zero) }
     var screenSize by remember { mutableStateOf(IntSize.Zero) }
     val animProgress = remember { Animatable(0f) }
@@ -66,6 +67,13 @@ fun CountdownScreen(
             snapshotFlow { animProgress.value }.first { it <= 0.01f }
             dialogVisible = false
         }
+    }
+
+    // Edit dialog animation
+    val editAnimProgress = remember { Animatable(0f) }
+    LaunchedEffect(editItem) {
+        if (editItem != null) editAnimProgress.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = 450f))
+        else editAnimProgress.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 350f))
     }
 
     Scaffold(
@@ -118,23 +126,25 @@ fun CountdownScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(items = items, key = { it.item.id }) { countdown ->
-                        CountdownCard(item = countdown, formatDate = { viewModel.formatDate(it) }, onDelete = { viewModel.deleteCountdown(countdown.item.id) })
+                        CountdownCard(
+                            item = countdown,
+                            formatDate = { viewModel.formatDate(it) },
+                            onClick = { viewModel.showEditDialog(countdown) }
+                        )
                     }
                 }
             }
         }
     }
 
-    // FAB-origin dialog overlay
+    // Add dialog overlay (FAB-origin)
     if (dialogVisible || animProgress.value > 0.01f) {
         val v = animProgress.value
         val pivotX = if (screenSize.width > 0) fabBounds.center.x / screenSize.width.toFloat() else 0.97f
         val pivotY = if (screenSize.height > 0) fabBounds.center.y / screenSize.height.toFloat() else 0.98f
 
-        // Scrim
         Box(Modifier.fillMaxSize().graphicsLayer { alpha = v * 0.5f }.background(Color.Black)
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { viewModel.hideAddDialog() })
-        // Card from FAB pivot
         Box(
             Modifier.fillMaxSize().graphicsLayer {
                 alpha = v; val s = 0.08f + 0.92f * v; scaleX = s; scaleY = s
@@ -148,25 +158,42 @@ fun CountdownScreen(
             )
         }
     }
+
+    // Edit dialog overlay
+    val ev = editAnimProgress.value
+    if (editItem != null || ev > 0.01f) {
+        Box(Modifier.fillMaxSize().graphicsLayer { alpha = ev * 0.5f }.background(Color.Black)
+            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { viewModel.hideEditDialog() })
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(Modifier.graphicsLayer { alpha = ev; val s = 0.08f + 0.92f * ev; scaleX = s; scaleY = s }) {
+                EditCountdownDialogContent(
+                    item = editItem!!,
+                    formatDate = { viewModel.formatDate(it) },
+                    onDismiss = { viewModel.hideEditDialog() },
+                    onSave = { title, date -> viewModel.updateCountdown(editItem!!.item.id, title, date) },
+                    onDelete = { viewModel.deleteCountdown(editItem!!.item.id) }
+                )
+            }
+        }
+    }
 }
 
 @Composable
 private fun CountdownCard(
     item: CountdownRepository.CountdownWithDays,
     formatDate: (Long) -> String,
-    onDelete: () -> Unit
+    onClick: () -> Unit
 ) {
     val cardColors = listOf(
         Color(0xFF7B1FA2), Color(0xFF1565C0), Color(0xFF2E7D32),
         Color(0xFFE65100), Color(0xFF00838F), Color(0xFFC62828)
     )
     val themeColor = cardColors[kotlin.math.abs(item.item.title.hashCode()) % cardColors.size]
-    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { showDeleteConfirm = true },
+            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -184,13 +211,6 @@ private fun CountdownCard(
                 style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, color = themeColor
             )
         }
-    }
-    if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false }, title = { Text("删除倒数日") }, text = { Text("确定要删除「${item.item.title}」吗？") },
-            confirmButton = { TextButton(onClick = { onDelete(); showDeleteConfirm = false }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("删除") } },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") } }
-        )
     }
 }
 
@@ -251,7 +271,6 @@ private fun AddCountdownDialogContent(
         }
     }
 
-    // DatePicker dialog
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -264,11 +283,98 @@ private fun AddCountdownDialogContent(
                     showDatePicker = false
                 }) { Text("确定") }
             },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("取消") }
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("取消") } }
+        ) { DatePicker(state = datePickerState) }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditCountdownDialogContent(
+    item: CountdownRepository.CountdownWithDays,
+    formatDate: (Long) -> String,
+    onDismiss: () -> Unit,
+    onSave: (title: String, targetDate: Long) -> Unit,
+    onDelete: () -> Unit
+) {
+    var title by remember { mutableStateOf(item.item.title) }
+    var selectedDateMs by remember { mutableStateOf(item.item.targetDate) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedDateMs)
+
+    val displayDate = java.text.SimpleDateFormat("yyyy年MM月dd日", java.util.Locale.getDefault()).format(java.util.Date(selectedDateMs))
+
+    Surface(
+        modifier = Modifier.widthIn(max = 360.dp).padding(24.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = Color.White,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
+    ) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(40.dp).align(Alignment.CenterHorizontally), tint = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("编辑倒数日", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
+            Spacer(modifier = Modifier.height(20.dp))
+            OutlinedTextField(
+                value = title, onValueChange = { title = it },
+                label = { Text("事件名称") },
+                singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = { showDatePicker = true },
+                modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Rounded.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(displayDate)
             }
-        ) {
-            DatePicker(state = datePickerState)
+            Spacer(modifier = Modifier.height(24.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                TextButton(
+                    onClick = { showDeleteConfirm = true },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("删除") }
+                Row {
+                    TextButton(onClick = onDismiss) { Text("取消") }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Button(
+                        onClick = {
+                            if (title.isNotBlank()) onSave(title.trim(), selectedDateMs)
+                        },
+                        enabled = title.isNotBlank(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) { Text("保存") }
+                }
+            }
         }
+    }
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val localDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+                        selectedDateMs = localDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    }
+                    showDatePicker = false
+                }) { Text("确定") }
+            },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("取消") } }
+        ) { DatePicker(state = datePickerState) }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("删除倒数日") },
+            text = { Text("确定要删除「${item.item.title}」吗？") },
+            confirmButton = { TextButton(onClick = { onDelete(); showDeleteConfirm = false }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("删除") } },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") } }
+        )
     }
 }

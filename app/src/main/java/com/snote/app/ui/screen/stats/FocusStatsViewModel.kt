@@ -104,7 +104,7 @@ class FocusStatsViewModel @Inject constructor(
                 val label = if (notebookId == "__others__") "其他"
                     else dataRepository.getNotebookById(notebookId)?.title ?: notebookId.take(8)
                 val sweepAngle = if (total > 0) (duration / total * 360f) else 0f
-                val color = if (notebookId == "__others__") Color(0xFFA1887F)
+                val color = if (notebookId == "__others__") Color(0xFFCE93D8)
                     else {
                         val idx = kotlin.math.abs(notebookId.hashCode()) % pieColors.size
                         pieColors[idx]

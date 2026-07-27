@@ -73,6 +73,11 @@ class CountdownRepository @Inject constructor(
         save()
     }
 
+    suspend fun updateCountdown(id: String, newTitle: String, newTargetDate: Long) = withContext(Dispatchers.IO) {
+        items = items.map { if (it.id == id) it.copy(title = newTitle, targetDate = newTargetDate) else it }
+        save()
+    }
+
     fun getCountdowns(): List<CountdownItem> = items
 
     data class CountdownWithDays(

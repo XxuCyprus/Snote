@@ -112,6 +112,17 @@ fun TodoContentScreen(
                 val dataDirPath = viewModel.getAbsolutePath("").removeSuffix("/")
                 val relativePath = savedPath.removePrefix("$dataDirPath/")
                 viewModel.updateImageContent(itemId, relativePath)
+                // 保存涂鸦数据 + 原图路径
+                val doodleFilePath = result.data?.getStringExtra(IMGEditActivity.EXTRA_DOODLE_FILE_PATH)
+                if (doodleFilePath != null) {
+                    val doodleFile = File(doodleFilePath)
+                    if (doodleFile.exists()) {
+                        val doodleJson = doodleFile.readText()
+                        val json = try { org.json.JSONObject(doodleJson) } catch (_: Exception) { org.json.JSONObject() }
+                        json.put("originalPath", pendingEditOriginalPath ?: "")
+                        File(savedPath + ".doodles.json").writeText(json.toString())
+                    }
+                }
             }
         }
         pendingEditSavePath = null
@@ -165,8 +176,12 @@ fun TodoContentScreen(
                 context.startActivity(Intent.createChooser(Intent(Intent.ACTION_VIEW).apply {
                     setDataAndType(uri, "video/*"); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                 }, "选择播放器"))
+            } else {
+                android.widget.Toast.makeText(context, "视频文件不存在: ${file.name}", android.widget.Toast.LENGTH_SHORT).show()
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(context, "无法播放视频: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+        }
         videoTargetPath = null
     }
 
@@ -185,8 +200,12 @@ fun TodoContentScreen(
                 context.startActivity(Intent.createChooser(Intent(Intent.ACTION_VIEW).apply {
                     setDataAndType(uri, mime); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                 }, "选择应用打开"))
+            } else {
+                android.widget.Toast.makeText(context, "文件不存在: ${file.name}", android.widget.Toast.LENGTH_SHORT).show()
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(context, "无法打开文件: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+        }
         fileTargetPath = null
     }
 
@@ -247,7 +266,7 @@ fun TodoContentScreen(
                         onDelete = { deleteTargetId = it },
                         onToggleComplete = { viewModel.requestComplete(items.find { ci -> ci.id == it } ?: return@TodoItemAdapter) },
                         onEdit = { id ->
-                            val item = currentItems.find { ci -> ci.id == id }
+                            val item = viewModel.items.value.find { ci -> ci.id == id }
                             if (item != null) {
                                 when (item.type) {
                                     ContentType.TEXT -> editingTextItem = item
@@ -264,11 +283,32 @@ fun TodoContentScreen(
                             val saveFile = File(parentDir, "edited_${UUID.randomUUID()}.jpg")
                             pendingEditSavePath = saveFile.absolutePath
                             pendingEditItemId = itemId
-                            pendingEditOriginalPath = path
+
+                            // 加载已有涂鸦数据
+                            val existingJsonFile = File("$path.doodles.json")
+                            val originalPath: String = if (existingJsonFile.exists()) {
+                                try {
+                                    val json = org.json.JSONObject(existingJsonFile.readText())
+                                    val op = json.optString("originalPath", "")
+                                    if (op.isNotEmpty()) op else path
+                                } catch (_: Exception) { path }
+                            } else path
+                            pendingEditOriginalPath = originalPath
+
+                            // 使用原始未编辑图片作为编辑底图
+                            val cleanPath = path + "_clean.jpg"
+                            if (!File(cleanPath).exists()) {
+                                try { File(originalPath).copyTo(File(cleanPath), overwrite = true) } catch (_: Exception) {}
+                            }
+                            val loadPath = cleanPath
+
                             val intent = Intent(context, IMGEditActivity::class.java)
-                                .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, Uri.fromFile(File(path)))
+                                .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, Uri.fromFile(File(loadPath)))
                                 .putExtra(IMGEditActivity.EXTRA_IMAGE_SAVE_PATH, saveFile.absolutePath)
                                 .putExtra("THEME_COLOR", themeColor.hashCode())
+                            if (existingJsonFile.exists()) {
+                                intent.putExtra(IMGEditActivity.EXTRA_DOODLE_FILE_PATH, existingJsonFile.absolutePath)
+                            }
                             imageEditLauncher.launch(intent)
                         },
                         onSaveToGallery = { path ->
