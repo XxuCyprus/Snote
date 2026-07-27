@@ -515,6 +515,7 @@ fun ReaderScreen(
                     title = "确认删除",
                     message = "确定要删除这个内容吗？",
                     offsetY = -40,
+                    cancelColor = viewModel.themeColor,
                     onConfirm = {
                         deleteTargetId?.let { viewModel.deleteContentItem(it) }
                         deleteTargetId = null
@@ -759,6 +760,7 @@ fun ReaderScreen(
         visible = deleteChapterTarget != null,
         title = "确认删除",
         message = "确定要删除该章节及其所有子章节和内容吗？",
+        cancelColor = viewModel.themeColor,
         onConfirm = {
             deleteChapterTarget?.let { viewModel.deleteChapter(it) }
             deleteChapterTarget = null
@@ -2395,6 +2397,7 @@ fun DeleteConfirmOverlay(
     title: String,
     message: String,
     offsetY: Int = 0,
+    cancelColor: Color = MaterialTheme.colorScheme.primary,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -2439,6 +2442,7 @@ fun DeleteConfirmOverlay(
                     DeleteConfirmContent(
                         title = title,
                         message = message,
+                        cancelColor = cancelColor,
                         onConfirm = onConfirm,
                         onDismiss = onDismiss
                     )
@@ -2452,6 +2456,7 @@ fun DeleteConfirmOverlay(
 fun DeleteConfirmContent(
     title: String,
     message: String,
+    cancelColor: Color = MaterialTheme.colorScheme.primary,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -2494,10 +2499,10 @@ fun DeleteConfirmContent(
             Spacer(Modifier.height(24.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.Center
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text("取消")
+                    Text("取消", color = cancelColor)
                 }
                 Spacer(Modifier.width(12.dp))
                 TextButton(

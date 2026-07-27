@@ -36,13 +36,25 @@ class JsonStorage {
 
     fun saveData(dataDir: File, data: SnoteData, fileName: String = dataFileName): Boolean {
         val dataFile = File(dataDir, fileName)
+        val tempFile = File(dataDir, "$fileName.tmp")
         return try {
             val json = gson.toJson(data)
-            dataFile.writeText(json, Charsets.UTF_8)
-            Log.d(TAG, "保存成功: ${dataFile.absolutePath}, 大小: ${dataFile.length()}")
+            // 先写入临时文件，再重命名（原子操作，防止崩溃时损坏）
+            tempFile.writeText(json, Charsets.UTF_8)
+            val success = tempFile.renameTo(dataFile)
+            if (success) {
+                Log.d(TAG, "保存成功: ${dataFile.absolutePath}, 大小: ${dataFile.length()}")
+            } else {
+                // renameTo 失败时尝试直接写入
+                Log.w(TAG, "renameTo 失败，尝试直接写入")
+                dataFile.writeText(json, Charsets.UTF_8)
+                tempFile.delete()
+                Log.d(TAG, "直接写入成功: ${dataFile.absolutePath}, 大小: ${dataFile.length()}")
+            }
             true
         } catch (e: Exception) {
             Log.e(TAG, "保存失败: ${e.message}", e)
+            tempFile.delete()  // 清理临时文件
             false
         }
     }

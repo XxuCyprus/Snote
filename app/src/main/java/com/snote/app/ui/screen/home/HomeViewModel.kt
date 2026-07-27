@@ -1,12 +1,12 @@
 package com.snote.app.ui.screen.home
 
 import android.os.Build
-import android.os.Environment
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.snote.app.data.model.Notebook
 import com.snote.app.data.repository.DataRepository
+import com.snote.app.data.storage.AppDataManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,7 +17,8 @@ import javax.inject.Inject
 @Stable
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val repository: DataRepository
+    private val repository: DataRepository,
+    private val appDataManager: AppDataManager
 ) : ViewModel() {
 
     private val _notebooks = MutableStateFlow<List<Notebook>>(emptyList())
@@ -49,6 +50,7 @@ class HomeViewModel @Inject constructor(
 
     // 记录初始化时的权限状态，用于 ON_RESUME 时检测权限变更
     private var hadStoragePermission = false
+    private var hasRunRecovery = false  // 确保恢复只运行一次
 
     init {
         hadStoragePermission = repository.hasFullStorageAccess()
@@ -58,14 +60,18 @@ class HomeViewModel @Inject constructor(
     private fun loadData() {
         viewModelScope.launch {
             _isLoading.value = true
+            repository.reinitialize()  // 确保数据目录正确（适应权限变化）
             repository.initializeDataDir()
             _notebooks.value = repository.getAllNotebooks()
             _isLoading.value = false
 
-            // 每次启动都扫描孤儿目录，尝试恢复被覆盖 JSON 的旧数据
-            val recovered = repository.scanAndRecoverOrphanedData()
-            if (recovered > 0) {
-                _notebooks.value = repository.getAllNotebooks()
+            // 只在首次启动时扫描孤儿目录，避免频繁触发恢复逻辑
+            if (!hasRunRecovery) {
+                hasRunRecovery = true
+                val recovered = repository.scanAndRecoverOrphanedData()
+                if (recovered > 0) {
+                    _notebooks.value = repository.getAllNotebooks()
+                }
             }
 
             // 检测是否需要存储权限
@@ -78,6 +84,7 @@ class HomeViewModel @Inject constructor(
     /**
      * Activity ON_RESUME 时调用。
      * 检测权限是否在设置页面中被授予，如果是则强制重新加载数据。
+     * 检测权限是否被撤销，如果是则紧急保存数据。
      */
     fun onAppResume() {
         val hasPerm = repository.hasFullStorageAccess()
@@ -88,14 +95,16 @@ class HomeViewModel @Inject constructor(
                 repository.mergeAndSwitchToExternal()
                 repository.reinitialize()
                 repository.initializeDataDir()
-                repository.scanAndRecoverOrphanedData()
                 _notebooks.value = repository.getAllNotebooks()
                 _showStoragePermissionDialog.value = false
             }
         } else if (hadStoragePermission && !hasPerm) {
-            // 权限从有→无：提醒用户
+            // 权限从有→无：紧急保存当前数据到内部存储
             hadStoragePermission = false
-            _showStoragePermissionDialog.value = true
+            viewModelScope.launch {
+                repository.emergencyBackupToInternal()
+                _showStoragePermissionDialog.value = true
+            }
         }
         hadStoragePermission = hasPerm
     }
@@ -163,10 +172,9 @@ class HomeViewModel @Inject constructor(
      */
     private fun needsStoragePermission(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
-        if (Environment.isExternalStorageManager()) return false
+        if (appDataManager.hasFullStorageAccess()) return false
         // 检查是否存在旧安装遗留的数据文件（无权限时读不到，但可判断文件存在性）
-        val dataDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-        val dataFile = java.io.File(java.io.File(dataDir, "Snote"), "snote_data.json")
+        val dataFile = java.io.File(appDataManager.dataDir, "snote_data.json")
         if (_notebooks.value.isEmpty() && dataFile.exists()) return true
         return false
     }

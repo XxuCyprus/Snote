@@ -3,10 +3,20 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <path
-        android:fillColor="#FF2E7D32"
-        android:pathData="M5,3 L19,3 A2,2 0 0,1 21,5 L21,19 A2,2 0 0,1 19,21 L5,21 A2,2 0 0,1 3,19 L3,5 A2,2 0 0,1 5,3 Z" />
+    <!-- 白色填充背景 -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M17.5,8 L10.5,15 L7,11.5 L8.5,10 L10.5,12 L16,6.5 Z" />
+        android:pathData="M5,3 L19,3 A2,2 0 0,1 21,5 L21,19 A2,2 0 0,1 19,21 L5,21 A2,2 0 0,1 3,19 L3,5 A2,2 0 0,1 5,3 Z" />
+    <!-- 黑色边框 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeWidth="2"
+        android:strokeColor="#FF000000"
+        android:pathData="M5,3 L19,3 A2,2 0 0,1 21,5 L21,19 A2,2 0 0,1 19,21 L5,21 A2,2 0 0,1 3,19 L3,5 A2,2 0 0,1 5,3 Z" />
+    <!-- 绿色对勾 -->
+    <path
+        android:pathData="M9,12 L11,14 L15,10"
+        android:strokeColor="#FF2E7D32"
+        android:strokeWidth="2.5"
+        android:fillColor="#00000000" />
 </vector>

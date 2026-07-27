@@ -190,8 +190,6 @@ class TodoItemAdapter(
         }
 
         fun bind(item: ContentItem, position: Int) {
-            val checkColor = if (isCompleted) Color.parseColor("#FF2E7D32") else 0x6649474F.toInt()
-
             if (item.type != lastContentType) {
                 tvText.visibility = View.GONE
                 imgContent.visibility = View.GONE
@@ -262,7 +260,7 @@ class TodoItemAdapter(
             imgCheck.setImageResource(
                 if (isCompleted) R.drawable.ic_checkbox_filled else R.drawable.ic_checkbox_outline
             )
-            imgCheck.setColorFilter(checkColor)
+            imgCheck.clearColorFilter()
             btnCheck.setOnClickListener { onToggleComplete(item.id) }
 
             // Background

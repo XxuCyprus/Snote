@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.snote.app.data.model.ContentItem
 import com.snote.app.data.model.ContentType
 import com.snote.app.data.repository.TodoRepository
+import com.snote.app.data.storage.AppDataManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -20,6 +21,7 @@ import javax.inject.Inject
 @HiltViewModel
 class TodoContentViewModel @Inject constructor(
     private val todoRepository: TodoRepository,
+    private val appDataManager: AppDataManager,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -85,7 +87,7 @@ class TodoContentViewModel @Inject constructor(
 
     fun startRecording() {
         try {
-            val dataDir = java.io.File(todoRepository.getDataDirPath())
+            val dataDir = java.io.File(appDataManager.getDataDirPath())
             if (!dataDir.exists()) dataDir.mkdirs()
             val todoDir = java.io.File(dataDir, "todos")
             if (!todoDir.exists()) todoDir.mkdirs()
@@ -147,7 +149,7 @@ class TodoContentViewModel @Inject constructor(
         }
         val recordedPath = currentRecordingPath
         if (recordedPath != null) {
-            java.io.File(todoRepository.getDataDirPath(), recordedPath).delete()
+            java.io.File(appDataManager.getDataDirPath(), recordedPath).delete()
         }
         currentRecordingPath = null
         _showRecorderDialog.value = false
@@ -169,6 +171,13 @@ class TodoContentViewModel @Inject constructor(
             todoRepository.addTextContent(sectionId, text)
             refreshItems()
             _showAddContentDialog.value = false
+        }
+    }
+
+    fun updateTextContent(itemId: String, newContent: String) {
+        viewModelScope.launch {
+            todoRepository.updateTextContent(itemId, newContent)
+            refreshItems()
         }
     }
 
@@ -235,7 +244,7 @@ class TodoContentViewModel @Inject constructor(
     }
 
     fun getAbsolutePath(relativePath: String): String {
-        return "${todoRepository.getDataDirPath()}/$relativePath"
+        return appDataManager.getAbsolutePath(relativePath).absolutePath
     }
 
     val isCompleted: Boolean get() = sectionId == "finished"

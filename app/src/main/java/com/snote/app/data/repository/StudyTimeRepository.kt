@@ -1,11 +1,9 @@
 package com.snote.app.data.repository
 
-import android.content.Context
-import android.os.Environment
 import com.snote.app.data.model.StudyRecord
+import com.snote.app.data.storage.AppDataManager
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -14,10 +12,12 @@ import javax.inject.Singleton
 
 @Singleton
 class StudyTimeRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    private val appDataManager: AppDataManager
 ) {
     private val gson = Gson()
     private var records: MutableList<StudyRecord> = mutableListOf()
+
+    private val dataDir: File get() = appDataManager.dataDir
 
     init {
         kotlinx.coroutines.runBlocking {
@@ -25,23 +25,14 @@ class StudyTimeRepository @Inject constructor(
         }
     }
 
-    private fun getDataDir(): File {
-        return try {
-            val documentsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            File(documentsDir, "Snote")
-        } catch (_: Exception) {
-            File(context.filesDir, "Snote")
-        }
-    }
-
     private suspend fun ensureDataDir() = withContext(Dispatchers.IO) {
-        val dir = getDataDir()
+        val dir = dataDir
         if (!dir.exists()) dir.mkdirs()
     }
 
     suspend fun loadRecords() = withContext(Dispatchers.IO) {
         ensureDataDir()
-        val file = File(getDataDir(), "snote_study_time.json")
+        val file = File(dataDir, "snote_study_time.json")
         if (file.exists()) {
             try {
                 val text = file.readText()
@@ -57,7 +48,7 @@ class StudyTimeRepository @Inject constructor(
 
     private suspend fun save() = withContext(Dispatchers.IO) {
         ensureDataDir()
-        val file = File(getDataDir(), "snote_study_time.json")
+        val file = File(dataDir, "snote_study_time.json")
         file.writeText(gson.toJson(records))
     }
 

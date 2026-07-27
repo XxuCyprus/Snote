@@ -1,12 +1,11 @@
 package com.snote.app.data.repository
 
 import android.content.Context
-import android.os.Environment
 import com.snote.app.data.model.ContentItem
 import com.snote.app.data.model.ContentType
 import com.snote.app.data.model.TodoBoard
+import com.snote.app.data.storage.AppDataManager
 import com.snote.app.data.storage.FileManager
-import com.snote.app.data.storage.JsonStorage
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -19,11 +18,13 @@ import javax.inject.Singleton
 @Singleton
 class TodoRepository @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val jsonStorage: JsonStorage,
-    private val fileManager: FileManager
+    private val fileManager: FileManager,
+    private val appDataManager: AppDataManager
 ) {
     private val gson = Gson()
     private var board = TodoBoard()
+
+    private val dataDir: File get() = appDataManager.dataDir
 
     init {
         kotlinx.coroutines.runBlocking {
@@ -31,25 +32,16 @@ class TodoRepository @Inject constructor(
         }
     }
 
-    private fun getDataDir(): File {
-        return try {
-            val documentsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            File(documentsDir, "Snote")
-        } catch (_: Exception) {
-            File(context.filesDir, "Snote")
-        }
-    }
-
     private suspend fun ensureDataDir() = withContext(Dispatchers.IO) {
-        val dir = getDataDir()
+        val dir = dataDir
         if (!dir.exists()) dir.mkdirs()
     }
 
-    fun getDataDirPath(): String = getDataDir().absolutePath
+    fun getDataDirPath(): String = appDataManager.getDataDirPath()
 
     suspend fun loadTodos() = withContext(Dispatchers.IO) {
         ensureDataDir()
-        val file = File(getDataDir(), "snote_todos.json")
+        val file = File(dataDir, "snote_todos.json")
         if (file.exists()) {
             try {
                 val text = file.readText()
@@ -64,9 +56,14 @@ class TodoRepository @Inject constructor(
     }
 
     private suspend fun save() = withContext(Dispatchers.IO) {
-        ensureDataDir()
-        val file = File(getDataDir(), "snote_todos.json")
-        file.writeText(gson.toJson(board))
+        try {
+            ensureDataDir()
+            val file = File(dataDir, "snote_todos.json")
+            file.writeText(gson.toJson(board))
+        } catch (e: Exception) {
+            android.util.Log.e("TodoRepo", "保存失败: ${e.message}", e)
+            // 保存失败时不修改内存数据
+        }
     }
 
     fun getBoard(): TodoBoard = board
@@ -80,7 +77,7 @@ class TodoRepository @Inject constructor(
     }
 
     suspend fun addImageContent(section: String, uri: android.net.Uri): ContentItem? = withContext(Dispatchers.IO) {
-        val dataDir = getDataDir()
+        val dataDir = dataDir
         val relativePath = fileManager.copyFileToNotebook(context, uri, dataDir, "todos", "IMAGE") ?: return@withContext null
         val item = ContentItem(type = ContentType.IMAGE, content = relativePath, order = board.unfinished.size)
         board = board.copy(unfinished = board.unfinished + item)
@@ -89,7 +86,7 @@ class TodoRepository @Inject constructor(
     }
 
     suspend fun addVideoContent(section: String, uri: android.net.Uri): ContentItem? = withContext(Dispatchers.IO) {
-        val dataDir = getDataDir()
+        val dataDir = dataDir
         val relativePath = fileManager.copyFileToNotebook(context, uri, dataDir, "todos", "VIDEO") ?: return@withContext null
         val item = ContentItem(type = ContentType.VIDEO, content = relativePath, order = board.unfinished.size)
         board = board.copy(unfinished = board.unfinished + item)
@@ -98,7 +95,7 @@ class TodoRepository @Inject constructor(
     }
 
     suspend fun addAudioContent(section: String, uri: android.net.Uri): ContentItem? = withContext(Dispatchers.IO) {
-        val dataDir = getDataDir()
+        val dataDir = dataDir
         val relativePath = fileManager.copyFileToNotebook(context, uri, dataDir, "todos", "AUDIO") ?: return@withContext null
         val item = ContentItem(type = ContentType.AUDIO, content = relativePath, order = board.unfinished.size)
         board = board.copy(unfinished = board.unfinished + item)
@@ -107,7 +104,7 @@ class TodoRepository @Inject constructor(
     }
 
     suspend fun addFileContent(section: String, uri: android.net.Uri): ContentItem? = withContext(Dispatchers.IO) {
-        val dataDir = getDataDir()
+        val dataDir = dataDir
         val relativePath = fileManager.copyFileToNotebook(context, uri, dataDir, "todos", "FILE") ?: return@withContext null
         val item = ContentItem(type = ContentType.FILE, content = relativePath, order = board.unfinished.size)
         board = board.copy(unfinished = board.unfinished + item)
@@ -120,6 +117,14 @@ class TodoRepository @Inject constructor(
         board = board.copy(unfinished = board.unfinished + item)
         save()
         item
+    }
+
+    suspend fun updateTextContent(itemId: String, newContent: String) = withContext(Dispatchers.IO) {
+        board = board.copy(
+            unfinished = board.unfinished.map { if (it.id == itemId) it.copy(content = newContent) else it },
+            finished = board.finished.map { if (it.id == itemId) it.copy(content = newContent) else it }
+        )
+        save()
     }
 
     suspend fun markItemDone(itemId: String) = withContext(Dispatchers.IO) {
@@ -146,7 +151,7 @@ class TodoRepository @Inject constructor(
             ?: return@withContext
 
         if (item.type != ContentType.TEXT) {
-            val dataDir = getDataDir()
+            val dataDir = dataDir
             val contentFile = File(dataDir, item.content)
             if (contentFile.exists()) contentFile.delete()
         }
@@ -190,7 +195,7 @@ class TodoRepository @Inject constructor(
         if (item.type != ContentType.VIDEO && item.type != ContentType.AUDIO && item.type != ContentType.FILE)
             return@withContext
 
-        val dataDir = getDataDir()
+        val dataDir = dataDir
         val oldFile = File(dataDir, item.content)
         if (!oldFile.exists()) return@withContext
 

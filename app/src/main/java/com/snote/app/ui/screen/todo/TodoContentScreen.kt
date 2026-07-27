@@ -51,6 +51,7 @@ import com.snote.app.data.model.ContentItem
 import com.snote.app.data.model.ContentType
 import com.snote.app.ui.screen.reader.AddContentDialog
 import com.snote.app.ui.screen.reader.AudioRecorderDialogContent
+import com.snote.app.ui.screen.reader.DeleteConfirmOverlay
 import com.snote.app.ui.screen.reader.EditTextDialogContent
 import java.io.File
 import java.util.UUID
@@ -369,14 +370,17 @@ fun TodoContentScreen(
     }
 
     // 删除确认
-    if (deleteTargetId != null) {
-        AlertDialog(
-            onDismissRequest = { deleteTargetId = null },
-            title = { Text("确认删除") }, text = { Text("确定要删除此项吗？") },
-            confirmButton = { TextButton(onClick = { deleteTargetId?.let { viewModel.deleteItem(it) }; deleteTargetId = null }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("删除") } },
-            dismissButton = { TextButton(onClick = { deleteTargetId = null }) { Text("取消") } }
-        )
-    }
+    DeleteConfirmOverlay(
+        visible = deleteTargetId != null,
+        title = "确认删除",
+        message = "确定要删除此项吗？",
+        cancelColor = themeColor,
+        onConfirm = {
+            deleteTargetId?.let { viewModel.deleteItem(it) }
+            deleteTargetId = null
+        },
+        onDismiss = { deleteTargetId = null }
+    )
 
     // FAB-origin 覆盖层动画（与笔记模块一致）
     if (isDialogActive || animProgress.value > 0.01f) {
@@ -448,7 +452,8 @@ fun TodoContentScreen(
                         onDismiss = { editingTextItem = null },
                         onSave = { newText ->
                             val id = editingTextItem?.id ?: return@EditTextDialogContent
-                            viewModel.addTextContent(newText); viewModel.deleteItem(id); editingTextItem = null
+                            viewModel.updateTextContent(id, newText)
+                            editingTextItem = null
                         }
                     )
                 }
@@ -487,6 +492,13 @@ private fun saveBitmapToGallery(context: android.content.Context, bmp: Bitmap) {
             put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
         }
         val uri = context.contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-        uri?.let { context.contentResolver.openOutputStream(it)?.use { out -> bmp.compress(Bitmap.CompressFormat.JPEG, 95, out) } }
-    } catch (_: Exception) {}
+        if (uri != null) {
+            context.contentResolver.openOutputStream(uri)?.use { out -> bmp.compress(Bitmap.CompressFormat.JPEG, 95, out) }
+            android.widget.Toast.makeText(context, "已保存到相册", android.widget.Toast.LENGTH_SHORT).show()
+        } else {
+            android.widget.Toast.makeText(context, "保存失败", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    } catch (e: Exception) {
+        android.widget.Toast.makeText(context, "保存失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+    }
 }

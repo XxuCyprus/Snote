@@ -553,25 +553,16 @@ fun NotebookCard(
     }
 
     if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            icon = { Icon(Icons.Rounded.Warning, contentDescription = null) },
-            title = { Text("确认删除") },
-            text = { Text("确定要删除「${notebook.title}」吗？所有内容和文件都将被永久删除。") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onDelete()
-                        showDeleteConfirm = false
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) { Text("删除") }
+        DeleteConfirmOverlay(
+            visible = true,
+            title = "确认删除",
+            message = "确定要删除「${notebook.title}」吗？所有内容和文件都将被永久删除。",
+            cancelColor = Color(0xFF1565C0),
+            onConfirm = {
+                onDelete()
+                showDeleteConfirm = false
             },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
-            }
+            onDismiss = { showDeleteConfirm = false }
         )
     }
 }

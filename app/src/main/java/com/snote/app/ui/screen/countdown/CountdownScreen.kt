@@ -76,6 +76,16 @@ fun CountdownScreen(
         else editAnimProgress.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 350f))
     }
 
+    // 持久化编辑项 — 退出动画期间保持内容可见
+    var editItemSnapshot by remember { mutableStateOf<CountdownRepository.CountdownWithDays?>(null) }
+    if (editItem != null) editItemSnapshot = editItem
+    LaunchedEffect(editItem) {
+        if (editItem == null) {
+            snapshotFlow { editAnimProgress.value }.first { it <= 0.01f }
+            editItemSnapshot = null
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -161,18 +171,20 @@ fun CountdownScreen(
 
     // Edit dialog overlay
     val ev = editAnimProgress.value
-    if (editItem != null || ev > 0.01f) {
+    if (editItemSnapshot != null || ev > 0.01f) {
         Box(Modifier.fillMaxSize().graphicsLayer { alpha = ev * 0.5f }.background(Color.Black)
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { viewModel.hideEditDialog() })
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Box(Modifier.graphicsLayer { alpha = ev; val s = 0.08f + 0.92f * ev; scaleX = s; scaleY = s }) {
-                EditCountdownDialogContent(
-                    item = editItem!!,
-                    formatDate = { viewModel.formatDate(it) },
-                    onDismiss = { viewModel.hideEditDialog() },
-                    onSave = { title, date -> viewModel.updateCountdown(editItem!!.item.id, title, date) },
-                    onDelete = { viewModel.deleteCountdown(editItem!!.item.id) }
-                )
+                editItemSnapshot?.let { currentItem ->
+                    EditCountdownDialogContent(
+                        item = currentItem,
+                        formatDate = { viewModel.formatDate(it) },
+                        onDismiss = { viewModel.hideEditDialog() },
+                        onSave = { title, date -> viewModel.updateCountdown(currentItem.item.id, title, date) },
+                        onDelete = { viewModel.deleteCountdown(currentItem.item.id) }
+                    )
+                }
             }
         }
     }
@@ -272,19 +284,17 @@ private fun AddCountdownDialogContent(
     }
 
     if (showDatePicker) {
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { millis ->
-                        val localDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
-                        selectedDateMs = localDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                    }
-                    showDatePicker = false
-                }) { Text("确定") }
+        AnimatedDatePickerOverlay(
+            datePickerState = datePickerState,
+            onConfirm = {
+                datePickerState.selectedDateMillis?.let { millis ->
+                    val localDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+                    selectedDateMs = localDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                }
+                showDatePicker = false
             },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("取消") } }
-        ) { DatePicker(state = datePickerState) }
+            onDismiss = { showDatePicker = false }
+        )
     }
 }
 
@@ -353,19 +363,17 @@ private fun EditCountdownDialogContent(
     }
 
     if (showDatePicker) {
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { millis ->
-                        val localDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
-                        selectedDateMs = localDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                    }
-                    showDatePicker = false
-                }) { Text("确定") }
+        AnimatedDatePickerOverlay(
+            datePickerState = datePickerState,
+            onConfirm = {
+                datePickerState.selectedDateMillis?.let { millis ->
+                    val localDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+                    selectedDateMs = localDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                }
+                showDatePicker = false
             },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("取消") } }
-        ) { DatePicker(state = datePickerState) }
+            onDismiss = { showDatePicker = false }
+        )
     }
 
     if (showDeleteConfirm) {
@@ -376,5 +384,90 @@ private fun EditCountdownDialogContent(
             confirmButton = { TextButton(onClick = { onDelete(); showDeleteConfirm = false }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("删除") } },
             dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") } }
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AnimatedDatePickerOverlay(
+    datePickerState: DatePickerState,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val animProgress = remember { Animatable(0f) }
+    var isVisible by remember { mutableStateOf(true) }
+    var shouldConfirm by remember { mutableStateOf(false) }
+
+    // 打开动画
+    LaunchedEffect(Unit) {
+        animProgress.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 400f))
+    }
+
+    // 关闭动画
+    LaunchedEffect(isVisible) {
+        if (!isVisible) {
+            animProgress.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 500f))
+            if (shouldConfirm) {
+                onConfirm()
+            } else {
+                onDismiss()
+            }
+        }
+    }
+
+    val v = animProgress.value
+    Box(Modifier.fillMaxSize()) {
+        // 背景遮罩
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = v * 0.5f }
+                .background(Color.Black)
+                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {
+                    shouldConfirm = false
+                    isVisible = false
+                }
+        )
+        // DatePicker 卡片
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.graphicsLayer {
+                    alpha = v
+                    // 从 0.5 缩放到 1.0（50%变化，更明显）
+                    val s = 0.5f + 0.5f * v
+                    scaleX = s
+                    scaleY = s
+                }
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(28.dp),
+                    color = Color.White,
+                    tonalElevation = 0.dp,
+                    shadowElevation = 0.dp
+                ) {
+                    Column {
+                        DatePicker(
+                            state = datePickerState,
+                            colors = DatePickerDefaults.colors(containerColor = Color.White)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(end = 12.dp, bottom = 12.dp),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(onClick = {
+                                shouldConfirm = false
+                                isVisible = false
+                            }) { Text("取消") }
+                            Spacer(Modifier.width(8.dp))
+                            TextButton(onClick = {
+                                // 先执行确认逻辑，再播放关闭动画
+                                shouldConfirm = true
+                                isVisible = false
+                            }) { Text("确定") }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

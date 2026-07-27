@@ -45,6 +45,15 @@ class FileManager {
         contentType: String
     ): String? {
         return try {
+            // 检查目录是否可写
+            if (!dataDir.exists()) {
+                dataDir.mkdirs()
+            }
+            if (!dataDir.canWrite()) {
+                android.util.Log.e("FileManager", "数据目录不可写: ${dataDir.absolutePath}")
+                return null
+            }
+
             val subDir = when (contentType) {
                 "IMAGE" -> "images"
                 "VIDEO" -> "videos"
@@ -68,10 +77,16 @@ class FileManager {
                 }
             }
 
+            // 验证文件是否成功写入
+            if (!targetFile.exists() || targetFile.length() == 0L) {
+                android.util.Log.e("FileManager", "文件写入失败或为空: ${targetFile.absolutePath}")
+                return null
+            }
+
             // 返回相对路径
             "$notebookId/$subDir/$fileName"
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("FileManager", "复制文件失败: ${e.message}", e)
             null
         }
     }

@@ -2,13 +2,15 @@ package com.snote.app.data.repository
 
 import android.content.Context
 import android.os.Build
-import android.os.Environment
 import android.util.Log
 import com.snote.app.data.model.*
+import com.snote.app.data.storage.AppDataManager
 import com.snote.app.data.storage.FileManager
 import com.snote.app.data.storage.JsonStorage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
@@ -18,66 +20,44 @@ import javax.inject.Singleton
 class DataRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val jsonStorage: JsonStorage,
-    private val fileManager: FileManager
+    private val fileManager: FileManager,
+    private val appDataManager: AppDataManager
 ) {
     private val TAG = "SnoteRepo"
     private var data = SnoteData()
-    private var dataDir: File = getDefaultDataDir()
+    // dataDir 改为 getter，每次访问实时获取，适应权限变化
+    private val dataDir: File get() = appDataManager.dataDir
     private var isInitialized = false
     private var dataFileName = "snote_data.json"
-
-    /**
-     * 获取默认数据目录：Documents/Snote/
-     * 如果外部存储不可用，降级到应用内部存储
-     */
-    private fun getDefaultDataDir(): File {
-        return try {
-            val state = Environment.getExternalStorageState()
-            if (Environment.MEDIA_MOUNTED == state) {
-                val documentsDir = Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_DOCUMENTS
-                )
-                File(documentsDir, "Snote")
-            } else {
-                Log.w(TAG, "外部存储不可用(state=$state)，使用内部存储")
-                File(context.filesDir, "Snote")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "获取外部存储路径失败，降级到内部存储", e)
-            File(context.filesDir, "Snote")
-        }
-    }
+    private val dataMutex = Mutex()  // 保护 data 变量的并发访问
 
     /**
      * 检查是否有完整文件访问权限（API 30+）
      */
-    fun hasFullStorageAccess(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Environment.isExternalStorageManager()
-        } else {
-            true
-        }
-    }
+    fun hasFullStorageAccess(): Boolean = appDataManager.hasFullStorageAccess()
 
     /**
-     * 重置初始化标记 + 数据目录，允许下次 initializeDataDir 重新加载数据。
+     * 重置初始化标记，允许下次 initializeDataDir 重新加载数据。
      * 用于权限变更后强制重新扫描数据目录。
      */
     fun reinitialize() {
         isInitialized = false
-        dataDir = getDefaultDataDir()
         dataFileName = "snote_data.json"
     }
 
     /**
-     * 初始化数据目录
+     * 初始化数据目录（安全版本，不会覆盖现有数据）
+     * 如果数据目录发生变化（权限变化），会强制重新加载
      */
     suspend fun initializeDataDir() = withContext(Dispatchers.IO) {
-        if (isInitialized) {
-            Log.d(TAG, "已初始化，跳过")
+        val currentDir = appDataManager.dataDir
+        if (isInitialized && dataDir.absolutePath == currentDir.absolutePath) {
+            Log.d(TAG, "已初始化且目录未变，跳过")
             return@withContext
         }
+        // 目录变化或首次初始化，强制重新加载
         isInitialized = true
+        Log.d(TAG, "初始化数据目录: ${dataDir.absolutePath}")
 
         // 无权限 + 外部有旧数据 → 用 pending 文件名，不覆盖原 snote_data.json
         if (!hasFullStorageAccess() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -107,12 +87,20 @@ class DataRepository @Inject constructor(
             }
         }
 
-        data = jsonStorage.loadData(dataDir, dataFileName)
-        Log.d(TAG, "加载完成, 笔记本数: ${data.notebooks.size}")
+        // 备选：加载 pending 文件
+        val loadedData = jsonStorage.loadData(dataDir, dataFileName)
+        if (loadedData.notebooks.isNotEmpty()) {
+            data = loadedData
+            Log.d(TAG, "从 $dataFileName 加载成功, 笔记本数: ${data.notebooks.size}")
+        } else {
+            // 都没有数据，保持当前内存数据（可能是恢复后的）
+            Log.d(TAG, "无可用数据文件，保持当前内存状态")
+        }
     }
 
     /**
      * 权限刚被授予 → 把 pending 文件的数据合并到主文件，删除 pending
+     * 合并策略：深度合并，保留最新内容
      */
     suspend fun mergeAndSwitchToExternal() = withContext(Dispatchers.IO) {
         if (!hasFullStorageAccess()) return@withContext
@@ -137,11 +125,18 @@ class DataRepository @Inject constructor(
             jsonStorage.loadData(dataDir, "snote_data_pending.json")
         } catch (_: Exception) { SnoteData() }
 
-        // 合并：主文件数据优先，pending 补充不存在的
+        // 深度合并：按笔记本 ID 合并，保留最新内容
         val mergedNotebooks = mainData.notebooks.toMutableList()
-        for (nb in pendingData.notebooks) {
-            if (mergedNotebooks.none { it.id == nb.id }) {
-                mergedNotebooks.add(nb)
+        for (pendingNb in pendingData.notebooks) {
+            val existingIdx = mergedNotebooks.indexOfFirst { it.id == pendingNb.id }
+            if (existingIdx >= 0) {
+                // 笔记本已存在 → 合并章节（保留主文件的章节，补充 pending 的新章节）
+                val existingNb = mergedNotebooks[existingIdx]
+                val mergedChapters = mergeChapters(existingNb.chapters, pendingNb.chapters)
+                mergedNotebooks[existingIdx] = existingNb.copy(chapters = mergedChapters)
+            } else {
+                // 笔记本不存在 → 直接添加
+                mergedNotebooks.add(pendingNb)
             }
         }
 
@@ -160,8 +155,40 @@ class DataRepository @Inject constructor(
     }
 
     /**
+     * 深度合并章节列表：保留主文件章节，补充 pending 的新章节
+     */
+    private fun mergeChapters(mainChapters: List<Chapter>, pendingChapters: List<Chapter>): List<Chapter> {
+        val merged = mainChapters.toMutableList()
+        for (pendingCh in pendingChapters) {
+            val existingIdx = merged.indexOfFirst { it.id == pendingCh.id }
+            if (existingIdx >= 0) {
+                // 章节已存在 → 合并子章节和内容
+                val existingCh = merged[existingIdx]
+                val mergedChildren = mergeChapters(existingCh.children, pendingCh.children)
+                // 保留主文件的内容，补充 pending 的新内容
+                val mergedItems = (existingCh.items + pendingCh.items.filter { pending ->
+                    existingCh.items.none { it.id == pending.id }
+                }).sortedBy { it.order }
+                merged[existingIdx] = existingCh.copy(
+                    children = mergedChildren,
+                    items = mergedItems
+                )
+            } else {
+                // 章节不存在 → 直接添加
+                merged.add(pendingCh)
+            }
+        }
+        return merged
+    }
+
+    /**
      * 扫描文件系统所有目录，恢复 JSON 中丢失或内容为空的笔记本。
-     * 不管 JSON 里有没有引用，只要目录下有媒体文件就恢复。
+     * 只在以下情况触发恢复：
+     * 1. JSON 中没有该笔记本（全新恢复）
+     * 2. JSON 中有该笔记本但完全没有章节结构（空笔记本）
+     *
+     * 重要：如果笔记本有任何章节（不管有没有内容），都不会触发恢复，
+     * 以保护用户的章节标题和多级目录结构。
      *
      * @return 恢复/补全的笔记本数量
      */
@@ -169,9 +196,10 @@ class DataRepository @Inject constructor(
         val existingNotebooks = data.notebooks.toMutableList()
         var recoveredCount = 0
 
-        // 扫描 dataDir 所有子目录（跳过 covers）
-        val allDirs = (dataDir.listFiles() ?: emptyArray()).filter { it.isDirectory && it.name != "covers" && it.name != "todos" }
-        val existingIds = existingNotebooks.map { it.id }.toSet()
+        // 扫描 dataDir 所有子目录（跳过 covers 和 todos）
+        val allDirs = (dataDir.listFiles() ?: emptyArray()).filter {
+            it.isDirectory && it.name != "covers" && it.name != "todos"
+        }
 
         for (dir in allDirs) {
             val notebookId = dir.name
@@ -185,18 +213,24 @@ class DataRepository @Inject constructor(
 
             val existingNotebook = existingNotebooks.find { it.id == notebookId }
             if (existingNotebook != null) {
-                // JSON 里有这个笔记本但内容可能是空的 → 补全
-                if (existingNotebook.chapters.isEmpty() || existingNotebook.chapters.all { it.items.isEmpty() }) {
-                    val chapter = Chapter(
-                        title = "已恢复内容", level = 1, order = 0,
-                        items = items.mapIndexed { idx, item -> item.copy(order = idx) }
-                    )
-                    val restored = existingNotebook.copy(chapters = listOf(chapter))
-                    val idx = existingNotebooks.indexOfFirst { it.id == notebookId }
-                    if (idx >= 0) existingNotebooks[idx] = restored
-                    recoveredCount++
-                    Log.d(TAG, "补全已有笔记本: $notebookId, 文件数: ${items.size}")
+                // JSON 里有这个笔记本
+                // 关键保护：只要有任何章节结构，就不触发恢复
+                if (existingNotebook.chapters.isNotEmpty()) {
+                    // 笔记本已有章节，跳过恢复（保护用户数据）
+                    Log.d(TAG, "跳过恢复（已有章节）: $notebookId, 章节数: ${existingNotebook.chapters.size}")
+                    continue
                 }
+
+                // 笔记本完全没有章节 → 创建一个恢复章节
+                val chapter = Chapter(
+                    title = "已恢复内容", level = 1, order = 0,
+                    items = items.mapIndexed { idx, item -> item.copy(order = idx) }
+                )
+                val restored = existingNotebook.copy(chapters = listOf(chapter))
+                val idx = existingNotebooks.indexOfFirst { it.id == notebookId }
+                if (idx >= 0) existingNotebooks[idx] = restored
+                recoveredCount++
+                Log.d(TAG, "补全已有笔记本: $notebookId, 文件数: ${items.size}")
             } else {
                 // JSON 里没有 → 新建恢复笔记本
                 val chapter = Chapter(
@@ -217,22 +251,85 @@ class DataRepository @Inject constructor(
 
         if (recoveredCount == 0) return@withContext 0
 
+        // 恢复前创建备份
+        try {
+            val backupFile = File(dataDir, "snote_data_backup_${System.currentTimeMillis()}.json")
+            jsonStorage.saveData(dataDir, data, backupFile.name)
+            Log.d(TAG, "恢复前备份: ${backupFile.absolutePath}")
+        } catch (e: Exception) {
+            Log.w(TAG, "恢复前备份失败: ${e.message}")
+        }
+
+        // 清理旧备份，只保留最近 5 个
+        try {
+            val backupFiles = dataDir.listFiles { _, name ->
+                name.startsWith("snote_data_backup_") && name.endsWith(".json")
+            }?.sortedByDescending { it.lastModified() }
+
+            backupFiles?.drop(5)?.forEach { file ->
+                file.delete()
+                Log.d(TAG, "删除旧备份: ${file.name}")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "清理旧备份失败: ${e.message}")
+        }
+
         data = data.copy(notebooks = existingNotebooks)
         save()
         Log.d(TAG, "恢复完成, 总笔记本数: ${existingNotebooks.size}")
         recoveredCount
     }
 
-    /** 扫描指定媒体目录，将文件转为 ContentItem */
+    /**
+     * 扫描指定媒体目录，将文件转为 ContentItem。
+     * 对于图片，正确匹配原图和编辑版本：
+     * - 每个原图只对应一个最新编辑版
+     * - 编辑版文件名格式: edited_{原图基础名}_{时间戳}.jpg
+     */
     private fun scanMediaDir(
         notebookDir: File, subDirName: String, type: ContentType, items: MutableList<ContentItem>
     ) {
         val subDir = File(notebookDir, subDirName)
         if (!subDir.exists() || !subDir.isDirectory) return
 
-        val files = subDir.listFiles()?.sortedBy { it.lastModified() } ?: return
-        for (file in files) {
-            if (file.isFile) {
+        val files = subDir.listFiles()?.filter { it.isFile } ?: return
+
+        if (type == ContentType.IMAGE) {
+            // 找到所有原始图片（排除伴生文件）
+            val originals = files.filter {
+                !it.name.startsWith("edited_") &&
+                !it.name.endsWith("_clean.jpg") &&
+                !it.name.endsWith(".doodles.json") &&
+                !it.name.endsWith(".strokes") &&
+                !it.name.endsWith(".base")
+            }
+
+            // 找到所有编辑版本
+            val allEdits = files.filter {
+                it.name.startsWith("edited_") && it.name.endsWith(".jpg")
+            }.sortedByDescending { it.lastModified() }
+
+            for (orig in originals) {
+                // 提取原图基础名（不含扩展名）
+                val origBaseName = orig.nameWithoutExtension
+
+                // 查找与该原图关联的编辑版本
+                // 只按文件名前缀匹配，不使用全局匹配
+                val matchingEdits = allEdits.filter { editName ->
+                    editName.nameWithoutExtension.contains(origBaseName)
+                }
+
+                val bestFile = if (matchingEdits.isNotEmpty()) {
+                    matchingEdits.first() // 已按 lastModified 降序排列
+                } else {
+                    orig
+                }
+
+                val relativePath = bestFile.absolutePath.removePrefix("${dataDir.absolutePath}/")
+                items.add(ContentItem(type = type, content = relativePath, order = items.size))
+            }
+        } else {
+            for (file in files.sortedBy { it.lastModified() }) {
                 val relativePath = file.absolutePath.removePrefix("${dataDir.absolutePath}/")
                 items.add(ContentItem(type = type, content = relativePath, order = items.size))
             }
@@ -242,7 +339,7 @@ class DataRepository @Inject constructor(
     /**
      * 获取数据目录路径（用于设置页面显示）
      */
-    fun getDataDirPath(): String = dataDir.absolutePath
+    fun getDataDirPath(): String = appDataManager.getDataDirPath()
 
     // ==================== 辅助方法：copy-on-write 树操作 ====================
 
@@ -319,10 +416,31 @@ class DataRepository @Inject constructor(
     }
 
     /**
-     * 保存数据到文件
+     * 保存数据到文件（带错误处理和回滚）
      */
     private suspend fun save() = withContext(Dispatchers.IO) {
-        jsonStorage.saveData(dataDir, data, dataFileName)
+        val success = jsonStorage.saveData(dataDir, data, dataFileName)
+        if (!success) {
+            Log.e(TAG, "保存失败！数据可能丢失")
+            // 保存失败时不修改内存数据，保持一致性
+        }
+    }
+
+    /**
+     * 紧急备份到内部存储（权限撤销时调用）
+     */
+    suspend fun emergencyBackupToInternal() = withContext(Dispatchers.IO) {
+        try {
+            val internalDir = appDataManager.internalDataDir
+            if (!internalDir.exists()) {
+                internalDir.mkdirs()
+            }
+            // 保存当前数据到内部存储
+            jsonStorage.saveData(internalDir, data, "snote_data.json")
+            Log.d(TAG, "紧急备份到内部存储成功: ${internalDir.absolutePath}")
+        } catch (e: Exception) {
+            Log.e(TAG, "紧急备份失败: ${e.message}", e)
+        }
     }
 
     // ==================== 笔记本操作 ====================
@@ -707,7 +825,7 @@ class DataRepository @Inject constructor(
      * 获取文件的绝对路径
      */
     fun getAbsolutePath(relativePath: String): File {
-        return File(dataDir, relativePath)
+        return appDataManager.getAbsolutePath(relativePath)
     }
 
     /**
@@ -930,14 +1048,4 @@ class DataRepository @Inject constructor(
 
     // ==================== 数据目录管理 ====================
 
-    /**
-     * 设置新的数据目录（用于迁移数据）
-     */
-    suspend fun setDataDir(newDir: File) = withContext(Dispatchers.IO) {
-        dataDir = newDir
-        if (!dataDir.exists()) {
-            dataDir.mkdirs()
-        }
-        data = jsonStorage.loadData(dataDir, dataFileName)
-    }
 }

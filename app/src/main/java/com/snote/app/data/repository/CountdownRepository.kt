@@ -1,11 +1,9 @@
 package com.snote.app.data.repository
 
-import android.content.Context
-import android.os.Environment
 import com.snote.app.data.model.CountdownItem
+import com.snote.app.data.storage.AppDataManager
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -14,10 +12,12 @@ import javax.inject.Singleton
 
 @Singleton
 class CountdownRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    private val appDataManager: AppDataManager
 ) {
     private val gson = Gson()
     private var items: List<CountdownItem> = emptyList()
+
+    private val dataDir: File get() = appDataManager.dataDir
 
     init {
         kotlinx.coroutines.runBlocking {
@@ -25,23 +25,14 @@ class CountdownRepository @Inject constructor(
         }
     }
 
-    private fun getDataDir(): File {
-        return try {
-            val documentsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            File(documentsDir, "Snote")
-        } catch (_: Exception) {
-            File(context.filesDir, "Snote")
-        }
-    }
-
     private suspend fun ensureDataDir() = withContext(Dispatchers.IO) {
-        val dir = getDataDir()
+        val dir = dataDir
         if (!dir.exists()) dir.mkdirs()
     }
 
     suspend fun loadCountdowns() = withContext(Dispatchers.IO) {
         ensureDataDir()
-        val file = File(getDataDir(), "snote_countdowns.json")
+        val file = File(dataDir, "snote_countdowns.json")
         if (file.exists()) {
             try {
                 val text = file.readText()
@@ -56,9 +47,14 @@ class CountdownRepository @Inject constructor(
     }
 
     private suspend fun save() = withContext(Dispatchers.IO) {
-        ensureDataDir()
-        val file = File(getDataDir(), "snote_countdowns.json")
-        file.writeText(gson.toJson(items))
+        try {
+            ensureDataDir()
+            val file = File(dataDir, "snote_countdowns.json")
+            file.writeText(gson.toJson(items))
+        } catch (e: Exception) {
+            android.util.Log.e("CountdownRepo", "保存失败: ${e.message}", e)
+            // 保存失败时不修改内存数据
+        }
     }
 
     suspend fun addCountdown(title: String, targetDate: Long) = withContext(Dispatchers.IO) {
