@@ -150,25 +150,33 @@ class TodoRepository @Inject constructor(
             ?: board.finished.find { it.id == itemId }
             ?: return@withContext
 
-        if (item.type != ContentType.TEXT) {
-            val dataDir = dataDir
-            val contentFile = File(dataDir, item.content)
-            if (contentFile.exists()) contentFile.delete()
-        }
-
         board = board.copy(
             unfinished = board.unfinished.filterNot { it.id == itemId },
             finished = board.finished.filterNot { it.id == itemId }
         )
         save()
+
+        // 保存成功后清理文件（先存JSON，后删文件，保证数据安全）
+        if (item.type != ContentType.TEXT) {
+            fileManager.deleteFile(dataDir, item.content)
+        }
     }
 
     suspend fun updateImageContent(itemId: String, newPath: String) = withContext(Dispatchers.IO) {
+        val oldItem = board.unfinished.find { it.id == itemId }
+            ?: board.finished.find { it.id == itemId }
+
         board = board.copy(
             unfinished = board.unfinished.map { if (it.id == itemId) it.copy(content = newPath) else it },
             finished = board.finished.map { if (it.id == itemId) it.copy(content = newPath) else it }
         )
         save()
+
+        // 保存成功后清理旧编辑版文件（先存JSON，后删文件，保证数据安全）
+        val oldPath = oldItem?.content
+        if (oldPath != null && oldPath != newPath) {
+            fileManager.deleteFile(dataDir, oldPath)
+        }
     }
 
     suspend fun swapTodoItems(itemId1: String, itemId2: String) = withContext(Dispatchers.IO) {

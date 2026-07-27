@@ -296,15 +296,9 @@ fun TodoContentScreen(
                             } else path
                             pendingEditOriginalPath = originalPath
 
-                            // 使用原始未编辑图片作为编辑底图
-                            val cleanPath = path + "_clean.jpg"
-                            if (!File(cleanPath).exists()) {
-                                try { File(originalPath).copyTo(File(cleanPath), overwrite = true) } catch (_: Exception) {}
-                            }
-                            val loadPath = cleanPath
-
+                            // 原图直接传给编辑器（IMGEditActivity 只读不写原图）
                             val intent = Intent(context, IMGEditActivity::class.java)
-                                .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, Uri.fromFile(File(loadPath)))
+                                .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, Uri.fromFile(File(originalPath)))
                                 .putExtra(IMGEditActivity.EXTRA_IMAGE_SAVE_PATH, saveFile.absolutePath)
                                 .putExtra("THEME_COLOR", themeColor.hashCode())
                             if (existingJsonFile.exists()) {

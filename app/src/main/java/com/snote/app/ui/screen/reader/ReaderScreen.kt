@@ -426,8 +426,7 @@ fun ReaderScreen(
                             pendingEditSavePath = saveFile.absolutePath
                             pendingEditItemId = itemId
 
-                            // 加载当前文件（可能是原图或已编辑的裁切版本）
-                            // 已有编辑记录时加载当前文件来保留裁切效果
+                            // 加载已有涂鸦数据
                             val existingJsonFile = File("$path.doodles.json")
                             val originalPath: String = if (existingJsonFile.exists()) {
                                 try {
@@ -438,20 +437,9 @@ fun ReaderScreen(
                             } else path
                             pendingEditOriginalPath = originalPath
 
-                            // 使用原始未编辑图片作为编辑底图，确保涂鸦坐标始终对齐
-                            val cleanPath = path + "_clean.jpg"
-                            if (!File(cleanPath).exists()) {
-                                // 首次编辑：将原始图片复制为 _clean.jpg
-                                try {
-                                    File(originalPath).copyTo(File(cleanPath), overwrite = true)
-                                } catch (e: Exception) {
-                                    // 复制失败时使用原路径
-                                }
-                            }
-                            val loadPath = cleanPath
-
+                            // 原图直接传给编辑器（IMGEditActivity 只读不写原图）
                             val intent = Intent(context, IMGEditActivity::class.java)
-                                .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, Uri.fromFile(File(loadPath)))
+                                .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, Uri.fromFile(File(originalPath)))
                                 .putExtra(IMGEditActivity.EXTRA_IMAGE_SAVE_PATH, saveFile.absolutePath)
                                 .putExtra("THEME_COLOR", viewModel.themeColor.hashCode())
                             // 加载已有涂鸦数据（通过文件路径避免 TransactionTooLargeException）
