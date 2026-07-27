@@ -53,6 +53,41 @@ class TodoRepository @Inject constructor(
         } else {
             board = TodoBoard()
         }
+        // 启动时清理孤儿文件（旧编辑版、伴生文件等）
+        cleanOrphanFiles()
+    }
+
+    /**
+     * 清理所有没有被 ContentItem 引用的冗余文件
+     * 检查两个路径：外部存储（Documents/Snote/）和内部存储
+     */
+    private fun cleanOrphanFiles() {
+        // 收集所有被引用的路径
+        val referencedPaths = (board.unfinished + board.finished)
+            .filter { it.type == ContentType.IMAGE }
+            .map { it.content }
+            .toSet()
+
+        // 检查两个可能的存储位置
+        val dirs = mutableListOf<File>()
+        // 当前 dataDir（可能是内部存储）
+        dirs.add(File(appDataManager.dataDir, "todos/images"))
+        // 外部存储（用户数据所在）
+        try {
+            val documentsDir = android.os.Environment.getExternalStoragePublicDirectory(
+                android.os.Environment.DIRECTORY_DOCUMENTS)
+            dirs.add(File(documentsDir, "Snote/todos/images"))
+        } catch (_: Exception) {}
+
+        for (imagesDir in dirs) {
+            if (!imagesDir.exists() || !imagesDir.isDirectory) continue
+            imagesDir.listFiles()?.forEach { file ->
+                if (!file.isFile) return@forEach
+                val relativePath = "todos/images/${file.name}"
+                if (relativePath in referencedPaths) return@forEach
+                file.delete()
+            }
+        }
     }
 
     private suspend fun save() = withContext(Dispatchers.IO) {
