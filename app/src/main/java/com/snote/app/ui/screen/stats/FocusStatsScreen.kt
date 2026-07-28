@@ -181,7 +181,7 @@ fun FocusStatsScreen(
                     // Center text
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "${totalDuration / 60}",
+                            text = "${(totalDuration + 59) / 60}",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onBackground
@@ -260,8 +260,9 @@ private fun LegendItem(slice: PieSlice) {
 }
 
 private fun formatDuration(seconds: Long): String {
-    val hours = seconds / 3600
-    val minutes = (seconds % 3600) / 60
+    val totalMinutes = (seconds + 59) / 60
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
     return when {
         hours > 0 -> "${hours}小时${minutes}分钟"
         else -> "${minutes}分钟"

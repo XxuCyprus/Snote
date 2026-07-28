@@ -4,7 +4,9 @@ import com.snote.app.BuildConfig
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -17,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -24,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,6 +45,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val dataDirPath by viewModel.dataDirPath.collectAsState()
+    val themeMode by viewModel.themeMode.collectAsState()
     val context = LocalContext.current
 
     Scaffold(
@@ -111,30 +116,24 @@ fun SettingsScreen(
                                 }
                             }
                             Spacer(modifier = Modifier.height(12.dp))
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                                )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        Icons.Rounded.Info,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "卸载App后数据不会丢失，重新安装后会自动读取",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
+                                Icon(
+                                    Icons.Rounded.Info,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "卸载App后数据不会丢失，重新安装后会自动读取",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
                             }
                             Spacer(modifier = Modifier.height(12.dp))
                             OutlinedButton(
@@ -147,13 +146,57 @@ fun SettingsScreen(
                                     } catch (_: Exception) {}
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp)
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
                             ) {
                                 Icon(Icons.Rounded.Security, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("授予文件访问权限")
                             }
                             Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+                }
+            }
+
+            // 主题部分
+            item {
+                SettingsSection(title = "主题") {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            ThemeColorItem(
+                                label = "清砚静蓝",
+                                gradientStart = BlueGradientStart,
+                                gradientEnd = BlueGradientEnd,
+                                isSelected = themeMode == ThemeMode.BLUE,
+                                onClick = { viewModel.setThemeMode(ThemeMode.BLUE) }
+                            )
+                            ThemeColorItem(
+                                label = "书卷桃粉",
+                                gradientStart = PinkGradientStart,
+                                gradientEnd = PinkGradientEnd,
+                                isSelected = themeMode == ThemeMode.PINK,
+                                onClick = { viewModel.setThemeMode(ThemeMode.PINK) }
+                            )
+                            ThemeColorItem(
+                                label = "笺页雾紫",
+                                gradientStart = PurpleGradientStart,
+                                gradientEnd = PurpleGradientEnd,
+                                isSelected = themeMode == ThemeMode.PURPLE,
+                                onClick = { viewModel.setThemeMode(ThemeMode.PURPLE) }
+                            )
                         }
                     }
                 }
@@ -172,31 +215,17 @@ fun SettingsScreen(
                     ) {
                         Column(modifier = Modifier.padding(20.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            brush = Brush.linearGradient(
-                                                colors = listOf(
-                                                    MaterialTheme.colorScheme.primary,
-                                                    MaterialTheme.colorScheme.tertiary
-                                                )
-                                            )
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.Rounded.MenuBook,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                }
+                                Image(
+                                    painter = painterResource(R.drawable.ic_app_icon),
+                                    contentDescription = "Snote 图标",
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.size(48.dp)
+                                )
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Column {
                                     Text(
                                         text = "Snote",
-                                        style = MaterialTheme.typography.titleLarge,
+                                        style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
@@ -208,7 +237,7 @@ fun SettingsScreen(
                             }
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "一款轻量级学习笔记应用，支持文字、图片、视频、音频、文件(Word/PDF/Excel)等多种内容，提供章节分级管理、图片涂鸦编辑、待办中心、专注统计、倒数日等能力，打造结构化的电子书式阅读与学习体验。",
+                                text = "一款简约而不简单的学习笔记应用，集笔记管理、待办追踪、专注统计与倒数日于一体。支持文字、图片、视频、音频及文件等多元内容类型，提供章节分级管理与图片涂鸦编辑，以结构化电子书的形式呈现知识体系，为学习者打造沉浸、高效的阅读与记录体验。",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 lineHeight = 24.sp
@@ -262,7 +291,8 @@ fun SettingsScreen(
                                     } catch (_: Exception) {}
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp)
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
                             ) {
                                 Icon(Icons.Rounded.OpenInBrowser, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -300,5 +330,57 @@ fun SettingsSection(
             modifier = Modifier.padding(bottom = 8.dp)
         )
         content()
+    }
+}
+
+/**
+ * 主题色选择项
+ */
+@Composable
+fun ThemeColorItem(
+    label: String,
+    gradientStart: Color,
+    gradientEnd: Color,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val gradient = remember(gradientStart, gradientEnd) {
+        Brush.linearGradient(colors = listOf(gradientStart, gradientEnd))
+    }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(brush = gradient)
+                .then(
+                    if (isSelected) Modifier.background(
+                        color = Color.White.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(16.dp)
+                    ) else Modifier
+                )
+                .clickable(interactionSource = null, indication = null, onClick = onClick),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isSelected) {
+                Icon(
+                    Icons.Rounded.Check,
+                    contentDescription = "已选择",
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            color = if (isSelected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

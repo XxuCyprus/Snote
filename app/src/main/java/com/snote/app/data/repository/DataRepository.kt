@@ -1048,4 +1048,16 @@ class DataRepository @Inject constructor(
 
     // ==================== 数据目录管理 ====================
 
+    // ==================== 主题偏好 ====================
+
+    fun getThemeMode(): String {
+        val prefs = context.getSharedPreferences("snote_prefs", android.content.Context.MODE_PRIVATE)
+        return prefs.getString("theme_mode", "PURPLE") ?: "PURPLE"
+    }
+
+    fun setThemeMode(mode: String) {
+        val prefs = context.getSharedPreferences("snote_prefs", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putString("theme_mode", mode).apply()
+    }
+
 }

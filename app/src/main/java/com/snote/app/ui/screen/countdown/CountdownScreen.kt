@@ -197,7 +197,7 @@ private fun CountdownCard(
     onClick: () -> Unit
 ) {
     val cardColors = listOf(
-        Color(0xFF7B1FA2), Color(0xFF1565C0), Color(0xFF2E7D32),
+        Color(0xFF7B1FA2), MaterialTheme.colorScheme.primary, Color(0xFF2E7D32),
         Color(0xFFE65100), Color(0xFF00838F), Color(0xFFC62828)
     )
     val themeColor = cardColors[kotlin.math.abs(item.item.title.hashCode()) % cardColors.size]

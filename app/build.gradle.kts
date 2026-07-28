@@ -22,8 +22,8 @@ android {
         applicationId = "com.snote.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 12
-        versionName = "4.5.1"
+        versionCode = 13
+        versionName = "5.0.0"
     }
 
     signingConfigs {

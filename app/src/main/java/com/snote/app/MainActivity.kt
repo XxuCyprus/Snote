@@ -1,5 +1,7 @@
 package com.snote.app
 
+import android.content.Context
+import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -16,6 +18,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.snote.app.ui.navigation.SnoteNavGraph
 import com.snote.app.ui.screen.permission.PermissionRequiredScreen
 import com.snote.app.ui.theme.SnoteTheme
+import com.snote.app.ui.theme.ThemeMode
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -23,11 +26,37 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val prefs = getSharedPreferences("snote_prefs", Context.MODE_PRIVATE)
+
         setContent {
-            SnoteTheme {
+            var themeMode by remember {
+                mutableStateOf(
+                    try {
+                        ThemeMode.valueOf(prefs.getString("theme_mode", "PURPLE") ?: "PURPLE")
+                    } catch (_: Exception) {
+                        ThemeMode.PURPLE
+                    }
+                )
+            }
+
+            // 监听 SharedPreferences 变化，实现即时切换
+            DisposableEffect(prefs) {
+                val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                    if (key == "theme_mode") {
+                        try {
+                            themeMode = ThemeMode.valueOf(prefs.getString("theme_mode", "PURPLE") ?: "PURPLE")
+                        } catch (_: Exception) {
+                            themeMode = ThemeMode.PURPLE
+                        }
+                    }
+                }
+                prefs.registerOnSharedPreferenceChangeListener(listener)
+                onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+            }
+
+            SnoteTheme(themeMode = themeMode) {
                 var hasPermission by remember { mutableStateOf(checkPermission()) }
 
-                // 监听每次 onResume，重新检查权限（防止通过卡 bug 绕过）
                 val lifecycleOwner = LocalLifecycleOwner.current
                 DisposableEffect(lifecycleOwner) {
                     val observer = LifecycleEventObserver { _, event ->

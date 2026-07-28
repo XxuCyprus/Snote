@@ -11,6 +11,7 @@ import com.snote.app.R
 import com.snote.app.data.model.Notebook
 
 class NotebookAdapter(
+    private val primaryColor: Int,
     private val onClick: (Notebook) -> Unit,
     private val onEdit: (Notebook) -> Unit,
     private val onDelete: (Notebook) -> Unit
@@ -59,6 +60,7 @@ class NotebookAdapter(
     override fun getItemCount(): Int = items.size
 
     inner class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val gradientBar: View = itemView.findViewById(R.id.gradientBar)
         private val iconBox: FrameLayout = itemView.findViewById(R.id.iconBox)
         private val imgIcon: ImageView = itemView.findViewById(R.id.imgNotebookIcon)
         private val tvTitle: TextView = itemView.findViewById(R.id.tvNotebookTitle)
@@ -68,6 +70,7 @@ class NotebookAdapter(
         private val btnDelete: FrameLayout = itemView.findViewById(R.id.btnDeleteNotebook)
 
         fun bind(notebook: Notebook) {
+            gradientBar.setBackgroundColor(primaryColor)
             tvTitle.text = notebook.title
 
             if (notebook.description.isNotEmpty()) {

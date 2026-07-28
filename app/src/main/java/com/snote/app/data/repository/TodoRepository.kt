@@ -250,7 +250,7 @@ class TodoRepository @Inject constructor(
     }
 
     suspend fun swapTodoItems(itemId1: String, itemId2: String) = withContext(Dispatchers.IO) {
-        // Try to find items in unfinished first, then finished
+        // Try to find items in unfinished
         val idx1_u = board.unfinished.indexOfFirst { it.id == itemId1 }
         val idx2_u = board.unfinished.indexOfFirst { it.id == itemId2 }
         if (idx1_u >= 0 && idx2_u >= 0) {
@@ -261,6 +261,19 @@ class TodoRepository @Inject constructor(
                 it[idx2_u] = item1.copy(order = item2.order)
             }.toList()
             board = board.copy(unfinished = swapped)
+            save()
+        }
+        // Try to find items in finished
+        val idx1_f = board.finished.indexOfFirst { it.id == itemId1 }
+        val idx2_f = board.finished.indexOfFirst { it.id == itemId2 }
+        if (idx1_f >= 0 && idx2_f >= 0) {
+            val item1 = board.finished[idx1_f]
+            val item2 = board.finished[idx2_f]
+            val swapped = board.finished.toMutableList().also {
+                it[idx1_f] = item2.copy(order = item1.order)
+                it[idx2_f] = item1.copy(order = item2.order)
+            }.toList()
+            board = board.copy(finished = swapped)
             save()
         }
     }

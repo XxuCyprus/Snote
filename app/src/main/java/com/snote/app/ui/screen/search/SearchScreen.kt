@@ -1,6 +1,7 @@
 package com.snote.app.ui.screen.search
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -80,13 +81,13 @@ fun SearchScreen(
                         Icons.Rounded.Search,
                         contentDescription = null,
                         modifier = Modifier.size(56.dp),
-                        tint = Color.Black
+                        tint = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = "输入关键词搜索笔记内容",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -102,13 +103,13 @@ fun SearchScreen(
                         Icons.Rounded.SearchOff,
                         contentDescription = null,
                         modifier = Modifier.size(56.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                        tint = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = "没有找到相关内容",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -124,7 +125,7 @@ fun SearchScreen(
                     Text(
                         text = "找到 ${results.size} 条结果",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(bottom = 4.dp)
                     )
                 }
@@ -171,9 +172,14 @@ fun SearchResultCard(
                     label = {
                         Text(
                             text = if (result.matchType == "title") "标题匹配" else "内容匹配",
-                            fontSize = 10.sp
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.primary
                         )
                     },
+                    colors = AssistChipDefaults.assistChipColors(
+                        containerColor = Color.White
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
                     modifier = Modifier.height(22.dp)
                 )
             }

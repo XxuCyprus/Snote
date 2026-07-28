@@ -1,17 +1,17 @@
 package com.snote.app.ui.theme
 
 import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -22,11 +22,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 
-private val LightColorScheme = lightColorScheme(
-    primary = PrimaryLight,
-    onPrimary = OnPrimaryLight,
-    primaryContainer = PrimaryContainerLight,
-    onPrimaryContainer = OnPrimaryContainerLight,
+enum class ThemeMode { BLUE, PINK, PURPLE }
+
+data class SnoteGradientColors(
+    val start: Color,
+    val end: Color
+)
+
+val LocalSnoteGradientColors = staticCompositionLocalOf {
+    SnoteGradientColors(start = PurpleGradientStart, end = PurpleGradientEnd)
+}
+
+// ========== 蓝色主题色彩方案 ==========
+private fun lightBlueColorScheme() = lightColorScheme(
+    primary = BluePrimaryLight,
+    onPrimary = BlueOnPrimaryLight,
+    primaryContainer = BluePrimaryContainerLight,
+    onPrimaryContainer = BlueOnPrimaryContainerLight,
     secondary = SecondaryLight,
     onSecondary = OnSecondaryLight,
     secondaryContainer = SecondaryContainerLight,
@@ -50,11 +62,125 @@ private val LightColorScheme = lightColorScheme(
     scrim = ScrimLight,
 )
 
-private val DarkColorScheme = darkColorScheme(
-    primary = PrimaryDark,
-    onPrimary = OnPrimaryDark,
-    primaryContainer = PrimaryContainerDark,
-    onPrimaryContainer = OnPrimaryContainerDark,
+private fun darkBlueColorScheme() = darkColorScheme(
+    primary = BluePrimaryDark,
+    onPrimary = BlueOnPrimaryDark,
+    primaryContainer = BluePrimaryContainerDark,
+    onPrimaryContainer = BlueOnPrimaryContainerDark,
+    secondary = SecondaryDark,
+    onSecondary = OnSecondaryDark,
+    secondaryContainer = SecondaryContainerDark,
+    onSecondaryContainer = OnSecondaryContainerDark,
+    tertiary = TertiaryDark,
+    onTertiary = OnTertiaryDark,
+    tertiaryContainer = TertiaryContainerDark,
+    onTertiaryContainer = OnTertiaryContainerDark,
+    background = BackgroundDark,
+    onBackground = OnBackgroundDark,
+    surface = SurfaceDark,
+    onSurface = OnSurfaceDark,
+    surfaceVariant = SurfaceVariantDark,
+    onSurfaceVariant = OnSurfaceVariantDark,
+    error = ErrorDark,
+    onError = OnErrorDark,
+    errorContainer = ErrorContainerDark,
+    onErrorContainer = OnErrorContainerDark,
+    outline = OutlineDark,
+    outlineVariant = OutlineVariantDark,
+    scrim = ScrimDark,
+)
+
+// ========== 粉色主题色彩方案 ==========
+private fun lightPinkColorScheme() = lightColorScheme(
+    primary = PinkPrimaryLight,
+    onPrimary = PinkOnPrimaryLight,
+    primaryContainer = PinkPrimaryContainerLight,
+    onPrimaryContainer = PinkOnPrimaryContainerLight,
+    secondary = SecondaryLight,
+    onSecondary = OnSecondaryLight,
+    secondaryContainer = SecondaryContainerLight,
+    onSecondaryContainer = OnSecondaryContainerLight,
+    tertiary = TertiaryLight,
+    onTertiary = OnTertiaryLight,
+    tertiaryContainer = TertiaryContainerLight,
+    onTertiaryContainer = OnTertiaryContainerLight,
+    background = BackgroundLight,
+    onBackground = OnBackgroundLight,
+    surface = SurfaceLight,
+    onSurface = OnSurfaceLight,
+    surfaceVariant = SurfaceVariantLight,
+    onSurfaceVariant = OnSurfaceVariantLight,
+    error = ErrorLight,
+    onError = OnErrorLight,
+    errorContainer = ErrorContainerLight,
+    onErrorContainer = OnErrorContainerLight,
+    outline = OutlineLight,
+    outlineVariant = OutlineVariantLight,
+    scrim = ScrimLight,
+)
+
+private fun darkPinkColorScheme() = darkColorScheme(
+    primary = PinkPrimaryDark,
+    onPrimary = PinkOnPrimaryDark,
+    primaryContainer = PinkPrimaryContainerDark,
+    onPrimaryContainer = PinkOnPrimaryContainerDark,
+    secondary = SecondaryDark,
+    onSecondary = OnSecondaryDark,
+    secondaryContainer = SecondaryContainerDark,
+    onSecondaryContainer = OnSecondaryContainerDark,
+    tertiary = TertiaryDark,
+    onTertiary = OnTertiaryDark,
+    tertiaryContainer = TertiaryContainerDark,
+    onTertiaryContainer = OnTertiaryContainerDark,
+    background = BackgroundDark,
+    onBackground = OnBackgroundDark,
+    surface = SurfaceDark,
+    onSurface = OnSurfaceDark,
+    surfaceVariant = SurfaceVariantDark,
+    onSurfaceVariant = OnSurfaceVariantDark,
+    error = ErrorDark,
+    onError = OnErrorDark,
+    errorContainer = ErrorContainerDark,
+    onErrorContainer = OnErrorContainerDark,
+    outline = OutlineDark,
+    outlineVariant = OutlineVariantDark,
+    scrim = ScrimDark,
+)
+
+// ========== 紫色主题色彩方案 ==========
+private fun lightPurpleColorScheme() = lightColorScheme(
+    primary = PurplePrimaryLight,
+    onPrimary = PurpleOnPrimaryLight,
+    primaryContainer = PurplePrimaryContainerLight,
+    onPrimaryContainer = PurpleOnPrimaryContainerLight,
+    secondary = SecondaryLight,
+    onSecondary = OnSecondaryLight,
+    secondaryContainer = SecondaryContainerLight,
+    onSecondaryContainer = OnSecondaryContainerLight,
+    tertiary = TertiaryLight,
+    onTertiary = OnTertiaryLight,
+    tertiaryContainer = TertiaryContainerLight,
+    onTertiaryContainer = OnTertiaryContainerLight,
+    background = BackgroundLight,
+    onBackground = OnBackgroundLight,
+    surface = SurfaceLight,
+    onSurface = OnSurfaceLight,
+    surfaceVariant = SurfaceVariantLight,
+    onSurfaceVariant = OnSurfaceVariantLight,
+    error = ErrorLight,
+    onError = OnErrorLight,
+    errorContainer = ErrorContainerLight,
+    onErrorContainer = OnErrorContainerLight,
+    outline = OutlineLight,
+    outlineVariant = OutlineVariantLight,
+    scrim = ScrimLight,
+)
+
+private fun darkPurpleColorScheme() = darkColorScheme(
+    primary = PurplePrimaryDark,
+    onPrimary = PurpleOnPrimaryDark,
+    primaryContainer = PurplePrimaryContainerDark,
+    onPrimaryContainer = PurpleOnPrimaryContainerDark,
     secondary = SecondaryDark,
     onSecondary = OnSecondaryDark,
     secondaryContainer = SecondaryContainerDark,
@@ -196,17 +322,20 @@ val SnoteTypography = Typography(
 
 @Composable
 fun SnoteTheme(
+    themeMode: ThemeMode = ThemeMode.PURPLE,
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+    val colorScheme = when (themeMode) {
+        ThemeMode.BLUE -> if (darkTheme) darkBlueColorScheme() else lightBlueColorScheme()
+        ThemeMode.PINK -> if (darkTheme) darkPinkColorScheme() else lightPinkColorScheme()
+        ThemeMode.PURPLE -> if (darkTheme) darkPurpleColorScheme() else lightPurpleColorScheme()
+    }
+
+    val gradientColors = when (themeMode) {
+        ThemeMode.BLUE -> SnoteGradientColors(BlueGradientStart, BlueGradientEnd)
+        ThemeMode.PINK -> SnoteGradientColors(PinkGradientStart, PinkGradientEnd)
+        ThemeMode.PURPLE -> SnoteGradientColors(PurpleGradientStart, PurpleGradientEnd)
     }
 
     val view = LocalView.current
@@ -217,10 +346,14 @@ fun SnoteTheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = SnoteTypography,
-        shapes = SnoteShapes,
-        content = content
-    )
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalSnoteGradientColors provides gradientColors
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = SnoteTypography,
+            shapes = SnoteShapes,
+            content = content
+        )
+    }
 }

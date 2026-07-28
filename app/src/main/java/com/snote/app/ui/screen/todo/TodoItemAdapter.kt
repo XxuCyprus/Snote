@@ -267,9 +267,7 @@ class TodoItemAdapter(
             btnCheck.setOnClickListener { onToggleComplete(item.id) }
 
             // Background
-            cardRoot.setBackgroundColor(
-                if (isCompleted) Color.parseColor("#FFF1F8E9") else Color.WHITE
-            )
+            cardRoot.setBackgroundColor(Color.WHITE)
 
             // Move buttons
             btnMoveUp.visibility = if (position > 0) View.VISIBLE else View.GONE

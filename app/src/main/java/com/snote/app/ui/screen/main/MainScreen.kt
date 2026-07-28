@@ -25,6 +25,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.snote.app.ui.theme.LocalSnoteGradientColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,13 +39,12 @@ fun MainScreen(
 ) {
     val unfinishedCount by viewModel.unfinishedCount.collectAsState()
     val todayMinutes by viewModel.todayStudyMinutes.collectAsState()
+    val currentQuote by viewModel.currentQuote.collectAsState()
 
     val mainLifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(mainLifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refresh()
-            }
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
         }
         mainLifecycleOwner.lifecycle.addObserver(observer)
         onDispose { mainLifecycleOwner.lifecycle.removeObserver(observer) }
@@ -67,7 +67,7 @@ fun MainScreen(
                     )
                 },
                 actions = {
-                    IconButton(onClick = onSettingsClick) {
+                    IconButton(onClick = { viewModel.prepareNextQuote(); onSettingsClick() }) {
                         Icon(Icons.Rounded.Settings, contentDescription = "设置")
                     }
                 },
@@ -81,10 +81,10 @@ fun MainScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .padding(horizontal = 20.dp, vertical = 8.dp)
         ) {
             Text(
-                text = "今天想学点什么？",
+                text = currentQuote,
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
@@ -95,12 +95,12 @@ fun MainScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // 2x2 网格
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(
                     modifier = Modifier.weight(1f),
@@ -112,8 +112,8 @@ fun MainScreen(
                         title = "我的笔记",
                         subtitle = "管理笔记本与学习资料",
                         badge = null,
-                        colors = listOf(Color(0xFF1565C0), Color(0xFF1976D2)),
-                        onClick = onMyNotesClick,
+                        colors = listOf(LocalSnoteGradientColors.current.start, LocalSnoteGradientColors.current.end),
+                        onClick = { viewModel.prepareNextQuote(); onMyNotesClick() },
                         progress = visible1
                     )
                     ModuleCard(
@@ -123,7 +123,7 @@ fun MainScreen(
                         subtitle = "待办事项追踪与管理",
                         badge = if (unfinishedCount > 0) "$unfinishedCount" else null,
                         colors = listOf(Color(0xFF2E7D32), Color(0xFF43A047)),
-                        onClick = onTodoClick,
+                        onClick = { viewModel.prepareNextQuote(); onTodoClick() },
                         progress = visible2
                     )
                 }
@@ -138,7 +138,7 @@ fun MainScreen(
                         subtitle = "今日学习时长统计",
                         badge = null,
                         colors = listOf(Color(0xFFE65100), Color(0xFFFF7043)),
-                        onClick = onStatsClick,
+                        onClick = { viewModel.prepareNextQuote(); onStatsClick() },
                         progress = visible3
                     )
                     ModuleCard(
@@ -148,7 +148,7 @@ fun MainScreen(
                         subtitle = "重要日期倒计时",
                         badge = null,
                         colors = listOf(Color(0xFF7B1FA2), Color(0xFFAB47BC)),
-                        onClick = onCountdownClick,
+                        onClick = { viewModel.prepareNextQuote(); onCountdownClick() },
                         progress = visible4
                     )
                 }
@@ -211,6 +211,7 @@ private fun ModuleCard(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
                 Box(

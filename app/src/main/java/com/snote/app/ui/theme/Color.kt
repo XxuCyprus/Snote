@@ -2,15 +2,56 @@
 
 import androidx.compose.ui.graphics.Color
 
-// ========== Snote 高级配色方案 ==========
-// 以深邃蓝为主色调，营造专业、沉浸的学习氛围
+// ========== Snote 三套主题色方案 ==========
 
-// 主色调 - 深邃蓝
-val PrimaryLight = Color(0xFF1565C0)
-val OnPrimaryLight = Color(0xFFFFFFFF)
-val PrimaryContainerLight = Color(0xFFD1E4FF)
-val OnPrimaryContainerLight = Color(0xFF001D36)
-val PrimaryVariantLight = Color(0xFF0D47A1)
+// ==================== 清砚静蓝主题 ====================
+val BluePrimaryLight = Color(0xFFA0AAE8)
+val BlueOnPrimaryLight = Color(0xFFFFFFFF)
+val BluePrimaryContainerLight = Color(0xFFD6D8F0)
+val BlueOnPrimaryContainerLight = Color(0xFF1A1A40)
+val BluePrimaryVariantLight = Color(0xFF7E8BD4)
+val BlueGradientStart = Color(0xFFA0AAE8)
+val BlueGradientEnd = Color(0xFF8E9AE0)
+
+val BluePrimaryDark = Color(0xFFB8BFF0)
+val BlueOnPrimaryDark = Color(0xFF1A1A40)
+val BluePrimaryContainerDark = Color(0xFF3A3A60)
+val BlueOnPrimaryContainerDark = Color(0xFFD6D8F0)
+
+// ==================== 书卷桃粉主题 ====================
+val PinkPrimaryLight = Color(0xFFF0A0B0)
+val PinkOnPrimaryLight = Color(0xFFFFFFFF)
+val PinkPrimaryContainerLight = Color(0xFFF8D8DE)
+val PinkOnPrimaryContainerLight = Color(0xFF401020)
+val PinkPrimaryVariantLight = Color(0xFFE0788C)
+val PinkGradientStart = Color(0xFFF0A0B0)
+val PinkGradientEnd = Color(0xFFE88CA0)
+
+val PinkPrimaryDark = Color(0xFFF8C0CC)
+val PinkOnPrimaryDark = Color(0xFF401020)
+val PinkPrimaryContainerDark = Color(0xFF602030)
+val PinkOnPrimaryContainerDark = Color(0xFFF8D8DE)
+
+// ==================== 笺页雾紫主题 ====================
+val PurplePrimaryLight = Color(0xFFC4A8E8)
+val PurpleOnPrimaryLight = Color(0xFFFFFFFF)
+val PurplePrimaryContainerLight = Color(0xFFE8DCF5)
+val PurpleOnPrimaryContainerLight = Color(0xFF2A1A40)
+val PurplePrimaryVariantLight = Color(0xFFA080D0)
+val PurpleGradientStart = Color(0xFFC4A8E8)
+val PurpleGradientEnd = Color(0xFFB090DD)
+
+val PurplePrimaryDark = Color(0xFFD8C4F0)
+val PurpleOnPrimaryDark = Color(0xFF2A1A40)
+val PurplePrimaryContainerDark = Color(0xFF4A3060)
+val PurpleOnPrimaryContainerDark = Color(0xFFE8DCF5)
+
+// 默认主题指向紫色
+val PrimaryLight = PurplePrimaryLight
+val OnPrimaryLight = PurpleOnPrimaryLight
+val PrimaryContainerLight = PurplePrimaryContainerLight
+val OnPrimaryContainerLight = PurpleOnPrimaryContainerLight
+val PrimaryVariantLight = PurplePrimaryVariantLight
 
 // 辅助色 - 温暖橙
 val SecondaryLight = Color(0xFFE65100)
@@ -43,11 +84,11 @@ val OutlineLight = Color(0xFF79747E)
 val OutlineVariantLight = Color(0xFFCAC4D0)
 val ScrimLight = Color(0xFF000000)
 
-// ========== 暗色主题 ==========
-val PrimaryDark = Color(0xFF90CAF9)
-val OnPrimaryDark = Color(0xFF003258)
-val PrimaryContainerDark = Color(0xFF00497D)
-val OnPrimaryContainerDark = Color(0xFFD1E4FF)
+// ========== 暗色主题（默认紫色） ==========
+val PrimaryDark = PurplePrimaryDark
+val OnPrimaryDark = PurpleOnPrimaryDark
+val PrimaryContainerDark = PurplePrimaryContainerDark
+val OnPrimaryContainerDark = PurpleOnPrimaryContainerDark
 
 val SecondaryDark = Color(0xFFFFB74D)
 val OnSecondaryDark = Color(0xFF3E2723)
@@ -76,8 +117,8 @@ val OutlineVariantDark = Color(0xFF49454F)
 val ScrimDark = Color(0xFF000000)
 
 // ========== 特殊颜色 ==========
-val GradientStart = Color(0xFF1565C0)
-val GradientEnd = Color(0xFF0D47A1)
+val GradientStart = PurpleGradientStart
+val GradientEnd = PurpleGradientEnd
 val CardShadow = Color(0x1A000000)
 val DividerColor = Color(0xFFE0E0E0)
 val IconBackground = Color(0xFFF5F5F5)

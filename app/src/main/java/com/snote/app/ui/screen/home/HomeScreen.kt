@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
@@ -190,8 +191,10 @@ fun HomeScreen(
                 modifier = Modifier.padding(paddingValues)
             )
         } else {
-            val notebookAdapter = remember {
+            val primaryColor = MaterialTheme.colorScheme.primary.toArgb()
+            val notebookAdapter = remember(primaryColor) {
                 NotebookAdapter(
+                    primaryColor = primaryColor,
                     onClick = { notebook ->
                         val chapterId = viewModel.getLastReadChapterId(notebook.id)
                         onNotebookClick(notebook.id, chapterId)
@@ -457,7 +460,7 @@ fun NotebookCard(
                         brush = Brush.horizontalGradient(
                             colors = listOf(
                                 MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.tertiary
+                                MaterialTheme.colorScheme.primary
                             )
                         )
                     )
@@ -557,7 +560,7 @@ fun NotebookCard(
             visible = true,
             title = "确认删除",
             message = "确定要删除「${notebook.title}」吗？所有内容和文件都将被永久删除。",
-            cancelColor = Color(0xFF1565C0),
+            cancelColor = MaterialTheme.colorScheme.primary,
             onConfirm = {
                 onDelete()
                 showDeleteConfirm = false

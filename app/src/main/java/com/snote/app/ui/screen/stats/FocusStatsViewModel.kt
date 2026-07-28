@@ -79,11 +79,11 @@ class FocusStatsViewModel @Inject constructor(
             }
 
             _isEmpty.value = false
-            _totalDuration.value = records.sumOf { it.durationSeconds }
+            _totalDuration.value = records.sumOf { (it.durationSeconds + 59) / 60 * 60 }
 
             // 按 notebookId 聚合
             val grouped = records.groupBy { it.notebookId }
-                .map { (key, values) -> key to values.sumOf { it.durationSeconds } }
+                .map { (key, values) -> key to values.sumOf { (it.durationSeconds + 59) / 60 * 60 } }
                 .sortedByDescending { it.second }
 
             // 规则: ≤3 展示全部, 4 展示4个, ≥5 展示top3 + 其他

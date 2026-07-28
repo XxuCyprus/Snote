@@ -2,6 +2,7 @@ package com.snote.app.ui.screen.settings
 
 import androidx.lifecycle.ViewModel
 import com.snote.app.data.repository.DataRepository
+import com.snote.app.ui.theme.ThemeMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +21,22 @@ class SettingsViewModel @Inject constructor(
     private val _dataDirPath = MutableStateFlow("")
     val dataDirPath: StateFlow<String> = _dataDirPath.asStateFlow()
 
+    // 主题模式
+    private val _themeMode = MutableStateFlow(ThemeMode.PURPLE)
+    val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
+
     init {
         _dataDirPath.value = repository.getDataDirPath()
+        val saved = repository.getThemeMode()
+        _themeMode.value = try {
+            ThemeMode.valueOf(saved)
+        } catch (_: Exception) {
+            ThemeMode.PURPLE
+        }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        _themeMode.value = mode
+        repository.setThemeMode(mode.name)
     }
 }
