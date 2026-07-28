@@ -121,21 +121,21 @@ fun FocusStatsScreen(
             if (isEmpty) {
                 Spacer(modifier = Modifier.weight(1f))
                 Icon(
-                    Icons.Rounded.PieChartOutline,
+                    Icons.Rounded.BarChart,
                     contentDescription = null,
                     modifier = Modifier.size(80.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                    tint = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = "今天还没有学习记录",
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.primary
                 )
                 Text(
                     text = "打开笔记开始学习吧",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.weight(1f))
             } else {

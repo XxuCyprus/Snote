@@ -91,7 +91,7 @@ fun MainScreen(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = if (todayMinutes > 0) "今日已学习 ${todayMinutes} 分钟" else "开始专注学习吧",
+                text = "今日已学习 ${todayMinutes} 分钟",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
