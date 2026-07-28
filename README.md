@@ -140,9 +140,9 @@ Snote/
 如果觉得 Snote 对你有帮助，欢迎请我喝杯奶茶。
 
 <p align="center">
-  <img src="donate-wechat.jpg" alt="微信赞赏" width="240">
+  <img src="assets/donate-wechat.png" alt="微信赞赏" width="240">
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="donate-alipay.jpg" alt="支付宝赞赏" width="240">
+  <img src="assets/donate-alipay.jpg" alt="支付宝赞赏" width="240">
 </p>
 
 ---
