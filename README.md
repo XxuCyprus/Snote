@@ -135,6 +135,18 @@ Snote/
 
 ---
 
+## ☕ 赞赏
+
+如果觉得 Snote 对你有帮助，欢迎请我喝杯奶茶。
+
+<p align="center">
+  <img src="donate-wechat.jpg" alt="微信赞赏" width="240">
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="donate-alipay.jpg" alt="支付宝赞赏" width="240">
+</p>
+
+---
+
 <p align="center">
   Made with ❤️ by <a href="https://github.com/XxuCyprus">Lnaaa</a>
 </p>
