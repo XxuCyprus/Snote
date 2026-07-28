@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="social-preview.png" alt="Snote" width="640">
+</p>
+
 # 📖 Snote — 为学习打造的多媒体整理工具
 
 <p align="center">
