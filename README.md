@@ -1,7 +1,7 @@
 # 📖 Snote — 为学习打造的多媒体整理工具
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-5.0.0-blue" alt="version">
+  <img src="https://img.shields.io/badge/version-5.0.1-blue" alt="version">
   <img src="https://img.shields.io/badge/Android-8.0+-green" alt="minSdk">
   <img src="https://img.shields.io/badge/Compose-Material%203-purple" alt="Compose">
   <img src="https://img.shields.io/badge/Kotlin-2.1.20-red" alt="Kotlin">
