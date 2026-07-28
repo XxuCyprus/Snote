@@ -121,6 +121,7 @@ Snote/
 │   └── src/main/java/me/minetsh/imaging/
 │       ├── core/                 # 核心编辑逻辑（涂鸦/贴纸/裁切/动画）
 │       └── view/                 # 自定义 View 组件
+├── assets/                        # 杂项资源
 ├── build.gradle.kts
 ├── gradle.properties
 └── settings.gradle.kts
