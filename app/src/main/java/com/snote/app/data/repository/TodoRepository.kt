@@ -60,13 +60,28 @@ class TodoRepository @Inject constructor(
     /**
      * 清理所有没有被 ContentItem 引用的冗余文件
      * 检查两个路径：外部存储（Documents/Snote/）和内部存储
+     * 保护机制：直接引用的图片、原始图片（从 .doodles.json 获取）、伴生文件
      */
     private fun cleanOrphanFiles() {
-        // 收集所有被引用的路径
+        // 收集所有被引用的图片路径
         val referencedPaths = (board.unfinished + board.finished)
             .filter { it.type == ContentType.IMAGE }
             .map { it.content }
             .toSet()
+
+        // 收集应保护的文件名（直接引用 + 从 .doodles.json 提取的原始图片名）
+        val protectedNames = referencedPaths.map { File(it).name }.toMutableSet()
+        for (refPath in referencedPaths) {
+            val doodlesFile = File(appDataManager.dataDir, "$refPath.doodles.json")
+            if (!doodlesFile.exists()) continue
+            try {
+                val json = org.json.JSONObject(doodlesFile.readText())
+                val originalPath = json.optString("originalPath", "")
+                if (originalPath.isNotEmpty()) {
+                    protectedNames.add(File(originalPath).name)
+                }
+            } catch (_: Exception) {}
+        }
 
         // 检查两个可能的存储位置
         val dirs = mutableListOf<File>()
@@ -83,8 +98,13 @@ class TodoRepository @Inject constructor(
             if (!imagesDir.exists() || !imagesDir.isDirectory) continue
             imagesDir.listFiles()?.forEach { file ->
                 if (!file.isFile) return@forEach
-                val relativePath = "todos/images/${file.name}"
-                if (relativePath in referencedPaths) return@forEach
+                val name = file.name
+                // 保护层1：直接引用的图片文件
+                if ("todos/images/$name" in referencedPaths) return@forEach
+                // 保护层2：原始图片文件
+                if (name in protectedNames) return@forEach
+                // 保护层3：伴生文件（.doodles.json, .strokes, .base, _clean.jpg）
+                if (protectedNames.any { fn -> name.startsWith(fn) }) return@forEach
                 file.delete()
             }
         }

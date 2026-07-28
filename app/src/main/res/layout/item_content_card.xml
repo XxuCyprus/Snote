@@ -183,6 +183,7 @@
                 android:visibility="gone">
 
                 <FrameLayout
+                    android:id="@+id/btnFileIcon"
                     android:layout_width="38dp"
                     android:layout_height="38dp"
                     android:background="@drawable/circle_level_dot">

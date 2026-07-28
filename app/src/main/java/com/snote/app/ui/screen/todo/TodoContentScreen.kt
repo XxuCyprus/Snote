@@ -40,6 +40,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
@@ -57,6 +58,7 @@ import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.flow.first
 import me.minetsh.imaging.IMGEditActivity
+import com.snote.app.ui.screen.reader.FullscreenImageDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -343,26 +345,62 @@ fun TodoContentScreen(
 
     // 全屏图片
     if (fullscreenImagePath != null) {
-        Dialog(onDismissRequest = { fullscreenImagePath = null }) {
-            Box(Modifier.fillMaxSize().background(Color.Black).clickable { fullscreenImagePath = null }, contentAlignment = Alignment.Center) {
-                val bmp = remember { BitmapFactory.decodeFile(fullscreenImagePath!!) }
-                if (bmp != null) {
-                    androidx.compose.foundation.Image(bitmap = bmp.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxWidth())
-                }
-            }
-        }
+        FullscreenImageDialog(
+            imagePath = fullscreenImagePath!!,
+            onDismiss = { fullscreenImagePath = null }
+        )
     }
 
     // 确认弹窗
     if (confirmTarget != null) {
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissConfirm() },
-            icon = { Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = themeColor) },
-            title = { Text(if (isCompleted) "撤销完成？" else "确认完成？") },
-            text = { Text(if (isCompleted) "确定要将此项移回未完成列表吗？" else "确定要将此项标记为已完成？") },
-            confirmButton = { Button(onClick = { viewModel.confirmComplete() }, shape = RoundedCornerShape(12.dp)) { Text("确认") } },
-            dismissButton = { TextButton(onClick = { viewModel.dismissConfirm() }) { Text("取消") } }
-        )
+        Dialog(onDismissRequest = { viewModel.dismissConfirm() }) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Rounded.CheckCircle,
+                        contentDescription = null,
+                        tint = themeColor,
+                        modifier = Modifier.size(40.dp)
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        if (isCompleted) "撤销完成？" else "确认完成？",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        if (isCompleted) "确定要将此项移回未完成列表吗？" else "确定要将此项标记为已完成？",
+                        color = Color.Gray,
+                        fontSize = 14.sp
+                    )
+                    Spacer(Modifier.height(20.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        TextButton(onClick = { viewModel.dismissConfirm() }) {
+                            Text("取消", color = themeColor)
+                        }
+                        Spacer(Modifier.width(16.dp))
+                        Button(
+                            onClick = { viewModel.confirmComplete() },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColor)
+                        ) {
+                            Text("确认", color = Color.White)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // 删除确认

@@ -174,6 +174,7 @@ class TodoItemAdapter(
         private val tvAudioCurrent: TextView = itemView.findViewById(R.id.tvAudioCurrent)
         private val tvAudioTotal: TextView = itemView.findViewById(R.id.tvAudioTotal)
         private val fileArea: LinearLayout = itemView.findViewById(R.id.fileArea)
+        private val btnFileIcon: FrameLayout = itemView.findViewById(R.id.btnFileIcon)
         private val tvFileName: TextView = itemView.findViewById(R.id.tvFileName)
         private val btnCheck: FrameLayout = itemView.findViewById(R.id.btnCheck)
         private val imgCheck: ImageView = itemView.findViewById(R.id.imgCheck)
@@ -249,6 +250,8 @@ class TodoItemAdapter(
                 ContentType.FILE -> {
                     fileArea.visibility = View.VISIBLE
                     tvFileName.text = File(item.content).name
+                    val fileBg = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(themeColor) }
+                    btnFileIcon.background = fileBg
                     fileArea.isClickable = true
                     fileArea.isFocusable = true
                     fileArea.setOnClickListener { onFileClick(getAbsolutePath(item.content)) }

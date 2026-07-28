@@ -1023,8 +1023,8 @@ class DataRepository @Inject constructor(
                         )
                     )
                 }
-                // 对视频/音频/文件类型，按文件名搜索
-                if (item.type != ContentType.TEXT) {
+                // 对视频/音频/文件类型，按文件名搜索（图片不搜索文件名）
+                if (item.type == ContentType.VIDEO || item.type == ContentType.AUDIO || item.type == ContentType.FILE) {
                     val fileName = java.io.File(item.content).name.lowercase()
                     if (fileName.contains(lowerQuery)) {
                         results.add(

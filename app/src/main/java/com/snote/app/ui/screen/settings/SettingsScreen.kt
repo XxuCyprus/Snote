@@ -4,7 +4,6 @@ import com.snote.app.BuildConfig
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,7 +15,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -43,15 +41,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val dataDirPath by viewModel.dataDirPath.collectAsState()
-    val recoveryResult by viewModel.recoveryResult.collectAsState()
     val context = LocalContext.current
-
-    LaunchedEffect(recoveryResult) {
-        recoveryResult?.let {
-            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-            viewModel.consumeRecoveryResult()
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -164,15 +154,6 @@ fun SettingsScreen(
                                 Text("授予文件访问权限")
                             }
                             Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedButton(
-                                onClick = { viewModel.recoverOrphanedData() },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("扫描恢复旧数据")
-                            }
                         }
                     }
                 }
@@ -227,7 +208,7 @@ fun SettingsScreen(
                             }
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "一款轻量级学习笔记应用，整合文字、图片、视频、音频与文件（Word/PDF/Excel）等多种内容，提供章节分级管理、图片涂鸦编辑、内容重命名等能力，打造结构化的电子书式阅读体验。",
+                                text = "一款轻量级学习笔记应用，支持文字、图片、视频、音频、文件(Word/PDF/Excel)等多种内容，提供章节分级管理、图片涂鸦编辑、待办中心、专注统计、倒数日等能力，打造结构化的电子书式阅读与学习体验。",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 lineHeight = 24.sp
@@ -287,6 +268,13 @@ fun SettingsScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("github.com/XxuCyprus/Snote")
                             }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "本项目完全免费，无任何广告，现已在 GitHub 开源，该地址为唯一官方下载途径。",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 20.sp
+                            )
                         }
                     }
                 }
