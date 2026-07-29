@@ -445,6 +445,7 @@ private fun AnimatedDatePickerOverlay(
                 }
             ) {
                 Surface(
+                    modifier = Modifier.widthIn(max = 352.dp).heightIn(max = 480.dp),
                     shape = RoundedCornerShape(28.dp),
                     color = Color.White,
                     tonalElevation = 0.dp,
@@ -454,7 +455,12 @@ private fun AnimatedDatePickerOverlay(
                         MaterialTheme(shapes = MaterialTheme.shapes.copy(extraSmall = RoundedCornerShape(12.dp))) {
                             DatePicker(
                                 state = datePickerState,
-                                colors = DatePickerDefaults.colors(containerColor = Color.White)
+                                colors = DatePickerDefaults.colors(
+                                    containerColor = Color.White,
+                                    headlineContentColor = MaterialTheme.colorScheme.primary,
+                                    titleContentColor = MaterialTheme.colorScheme.primary,
+                                    navigationContentColor = MaterialTheme.colorScheme.primary
+                                )
                             )
                         }
                         Row(
@@ -464,13 +470,13 @@ private fun AnimatedDatePickerOverlay(
                             TextButton(onClick = {
                                 shouldConfirm = false
                                 isVisible = false
-                            }) { Text("取消") }
+                            }) { Text("取消", color = MaterialTheme.colorScheme.primary) }
                             Spacer(Modifier.width(8.dp))
                             TextButton(onClick = {
                                 // 先执行确认逻辑，再播放关闭动画
                                 shouldConfirm = true
                                 isVisible = false
-                            }) { Text("确定") }
+                            }) { Text("确定", color = MaterialTheme.colorScheme.primary) }
                         }
                     }
                 }

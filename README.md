@@ -92,6 +92,8 @@ git clone https://github.com/XxuCyprus/Snote.git
 ```
 需要 JDK 21 及以上版本。用 Android Studio 打开项目，等待 Gradle Sync 完成后 Run。
 
+> 目前仅支持 Android 平台，暂无 iOS / HarmonyOS 适配计划。
+
 ---
 
 ## 📂 项目结构
