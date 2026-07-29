@@ -20,6 +20,9 @@ local.properties
 captures/
 .externalNativeBuild/
 
+# Kotlin
+.kotlin/
+
 # OS files
 .DS_Store
 Thumbs.db
