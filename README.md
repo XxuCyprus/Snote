@@ -1,7 +1,6 @@
 # 📖 Snote — 为学习打造的多媒体整理工具
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-5.0.1-blue" alt="version">
   <img src="https://img.shields.io/badge/Android-8.0+-green" alt="minSdk">
   <img src="https://img.shields.io/badge/Compose-Material%203-purple" alt="Compose">
   <img src="https://img.shields.io/badge/Kotlin-2.1.20-red" alt="Kotlin">
@@ -54,7 +53,7 @@
 
 ## 📱 存储与隐私
 
-所有数据存储在 `Documents/Snote/` 目录下，App 不包含任何用户数据：
+所有数据存储在 `Documents/Snote/` 目录下，无内置示例数据：
 
 - **极轻量** — App 体积不受内容数量影响，冗余文件自动清理
 - **卸载不丢失** — 删除 App 后数据文件保留在公共文档目录，重新安装自动恢复。可通过文件管理器复制整个 `Snote` 文件夹进行手动备份
@@ -103,8 +102,6 @@ Snote/
 │       │   ├── repository/        # 仓库层
 │       │   └── storage/           # 文件存储
 │       ├── di/                   # Hilt 依赖注入
-│       ├── domain/               # 用例层
-│       ├── util/                 # 工具类
 │       └── ui/                   # Compose UI 层
 │           ├── screen/main/      # 主页仪表盘（四模块入口）
 │           ├── screen/home/      # 我的笔记（笔记本列表）
@@ -138,7 +135,7 @@ Snote/
 
 ## ☕ 赞赏
 
-如果觉得 Snote 对你有帮助，欢迎请我喝杯奶茶。
+如果觉得 Snote 对你有帮助，欢迎请我喝杯奶茶，谢谢。
 
 <p align="center">
   <img src="assets/donate-wechat.png" alt="微信赞赏" width="240">
