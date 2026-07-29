@@ -6,7 +6,7 @@
   <img src="https://img.shields.io/badge/Kotlin-2.1.20-red" alt="Kotlin">
   <br>
   <img src="https://img.shields.io/github/stars/XxuCyprus/Snote?style=social" alt="stars">
-  <img src="https://visitor-badge.laobi.icu/badge?page_id=XxuCyprus.Snote" alt="visitors">
+  <img src="https://img.shields.io/github/watchers/XxuCyprus/Snote?style=social" alt="watchers">
 </p>
 
 > 一款简约而不简单的学习笔记应用，集笔记管理、待办追踪、专注统计与倒数日于一体。支持文字、图片、视频、音频及文件等多元内容类型，提供章节分级管理与图片涂鸦编辑，以结构化电子书的形式呈现知识体系，为学习者打造沉浸、高效的阅读与记录体验。
