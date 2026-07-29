@@ -256,10 +256,10 @@ fun TodoContentScreen(
                         Icon(
                             if (isCompleted) Icons.Rounded.TaskAlt else Icons.Rounded.PendingActions,
                             contentDescription = null, modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                            tint = themeColor.copy(alpha = 0.4f)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text(if (isCompleted) "暂无已完成项" else "暂无待办事项", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (isCompleted) "暂无已完成项" else "暂无待办事项", style = MaterialTheme.typography.bodyLarge, color = themeColor)
                     }
                 }
             } else {

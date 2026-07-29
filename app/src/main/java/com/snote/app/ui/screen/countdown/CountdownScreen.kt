@@ -123,9 +123,9 @@ fun CountdownScreen(
             if (items.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Rounded.DateRange, contentDescription = null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
+                        Icon(Icons.Rounded.DateRange, contentDescription = null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("还没有倒数日", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("还没有倒数日", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             } else {
