@@ -46,8 +46,10 @@ class ReaderViewModel @Inject constructor(
             0xFF3586D7.toInt(), // 蓝
             0xFF1F978B.toInt(), // 青
             0xFFE9661F.toInt(), // 橙
-            0xFFCD4242.toInt(), // 红
-            0xFF8B3AAD.toInt(), // 深紫
+            0xFFE0788C.toInt(), // 桃粉
+            0xFFA080D0.toInt(), // 笺页雾紫
+            0xFFE0788C.toInt(), // 书卷桃粉
+            0xFF7E8BD4.toInt(), // 清砚静蓝
             0xFF478D4B.toInt(), // 绿
             0xFF515FB5.toInt(), // 靛蓝
         )

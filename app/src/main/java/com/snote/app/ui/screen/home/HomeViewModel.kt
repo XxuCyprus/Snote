@@ -107,10 +107,11 @@ class HomeViewModel @Inject constructor(
             }
         }
         hadStoragePermission = hasPerm
+        refresh()
     }
 
     fun refresh() {
-        _notebooks.value = repository.getAllNotebooks().sortedByDescending { it.createdAt }
+        _notebooks.value = repository.getAllNotebooks()
     }
 
     /**

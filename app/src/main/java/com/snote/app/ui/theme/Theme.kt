@@ -206,7 +206,7 @@ private fun darkPurpleColorScheme() = darkColorScheme(
 
 val SnoteShapes = Shapes(
     extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
-    small = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+    small = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
     medium = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
     large = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
     extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)

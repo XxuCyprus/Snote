@@ -77,6 +77,11 @@ fun HomeScreen(
     var homeRecyclerView by remember { mutableStateOf<RecyclerView?>(null) }
     var isRestoringScroll by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<Notebook?>(null) }
+    var heldTitle by remember { mutableStateOf("") }
+
+    LaunchedEffect(deleteTarget) {
+        if (deleteTarget != null) heldTitle = deleteTarget?.title ?: ""
+    }
 
     // 监听 ON_RESUME，权限变更后自动重新加载数据
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -256,7 +261,7 @@ fun HomeScreen(
             DeleteConfirmOverlay(
                 visible = deleteTarget != null,
                 title = "确认删除",
-                message = "确定要删除「${deleteTarget?.title ?: ""}」及其所有章节内容吗？此操作不可恢复。",
+                message = "确定要删除「$heldTitle」及其所有章节内容吗？此操作不可恢复。",
                 onConfirm = {
                     deleteTarget?.let { viewModel.deleteNotebook(it.id) }
                     deleteTarget = null

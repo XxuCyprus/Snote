@@ -24,14 +24,16 @@ class NotebookAdapter(
         notifyDataSetChanged()
     }
 
-    // 浅色背景 + 对应深色图标：8种配色
+    // 浅色背景 + 对应深色图标：9种配色
     private val bgColors = intArrayOf(
         0xFFEDE7F6.toInt(), // 浅紫
         0xFFE3F2FD.toInt(), // 浅蓝
         0xFFE0F2F1.toInt(), // 浅青
         0xFFFFF3E0.toInt(), // 浅橙
         0xFFFCE4EC.toInt(), // 浅粉
-        0xFFF3E5F5.toInt(), // 浅紫红
+        0xFFE8DCF5.toInt(), // 笺页雾紫
+        0xFFF8D8DE.toInt(), // 书卷桃粉
+        0xFFD6D8F0.toInt(), // 清砚静蓝
         0xFFE8F5E9.toInt(), // 浅绿
         0xFFE8EAF6.toInt(), // 浅靛
     )
@@ -41,8 +43,10 @@ class NotebookAdapter(
         0xFF3586D7.toInt(), // 蓝
         0xFF1F978B.toInt(), // 青
         0xFFE9661F.toInt(), // 橙
-        0xFFCD4242.toInt(), // 红
-        0xFF8B3AAD.toInt(), // 深紫
+        0xFFE0788C.toInt(), // 桃粉
+        0xFFA080D0.toInt(), // 笺页雾紫
+        0xFFE0788C.toInt(), // 书卷桃粉
+        0xFF7E8BD4.toInt(), // 清砚静蓝
         0xFF478D4B.toInt(), // 绿
         0xFF515FB5.toInt(), // 靛蓝
     )

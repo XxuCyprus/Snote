@@ -20,10 +20,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.snote.app.R
 
 /**
  * 全屏权限申请界面 - 无法跳过，必须授予权限才能使用
@@ -67,7 +69,7 @@ fun PermissionRequiredScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // 图标
+            // 图标 - APP 图标
             Box(
                 modifier = Modifier
                     .size(120.dp)
@@ -76,10 +78,10 @@ fun PermissionRequiredScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Rounded.Folder,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                    painter = painterResource(id = R.drawable.ic_app_icon),
+                    contentDescription = "Snote",
+                    modifier = Modifier.size(72.dp),
+                    tint = Color.Unspecified
                 )
             }
 
@@ -92,17 +94,33 @@ fun PermissionRequiredScreen(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = "Snote 需要「所有文件访问权限」来保存您的笔记数据。\n\n" +
-                       "此权限确保：\n" +
-                       "• 笔记数据安全存储在设备上\n" +
-                       "• 卸载重装后数据可恢复\n" +
-                       "• 图片、视频、音频正常保存",
+                text = "Snote 需要「所有文件访问权限」来保存您的笔记数据。",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
+                lineHeight = 24.sp
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Text(
+                text = "\n    此权限确保：",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Start,
+                lineHeight = 24.sp
+            )
+
+            Text(
+                text = "  · 笔记数据安全存储在设备上\n" +
+                       "  · 卸载重装后数据可恢复\n" +
+                       "  · 图片、视频、音频正常保存",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Start,
                 lineHeight = 24.sp
             )
 

@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -83,19 +84,14 @@ fun MainScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 20.dp, vertical = 8.dp)
         ) {
-            Text(
-                text = currentQuote,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "今日已学习 ${todayMinutes} 分钟",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // 2x2 网格
             Column(
@@ -110,7 +106,7 @@ fun MainScreen(
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                         icon = Icons.Rounded.MenuBook,
                         title = "我的笔记",
-                        subtitle = "管理笔记本与学习资料",
+                        subtitle = "整理笔记与资料",
                         badge = null,
                         colors = listOf(LocalSnoteGradientColors.current.start, LocalSnoteGradientColors.current.end),
                         onClick = { viewModel.prepareNextQuote(); onMyNotesClick() },
@@ -153,6 +149,16 @@ fun MainScreen(
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = currentQuote,
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }

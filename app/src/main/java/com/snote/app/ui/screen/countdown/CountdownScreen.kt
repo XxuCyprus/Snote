@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.snote.app.data.repository.CountdownRepository
+import com.snote.app.ui.screen.reader.DeleteConfirmOverlay
 import kotlinx.coroutines.flow.first
 import java.time.Instant
 import java.time.ZoneId
@@ -175,7 +176,7 @@ fun CountdownScreen(
         Box(Modifier.fillMaxSize().graphicsLayer { alpha = ev * 0.5f }.background(Color.Black)
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { viewModel.hideEditDialog() })
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Box(Modifier.graphicsLayer { alpha = ev; val s = 0.08f + 0.92f * ev; scaleX = s; scaleY = s }) {
+            Box(Modifier.fillMaxSize().graphicsLayer { alpha = ev; val s = 0.08f + 0.92f * ev; scaleX = s; scaleY = s }, contentAlignment = Alignment.Center) {
                 editItemSnapshot?.let { currentItem ->
                     EditCountdownDialogContent(
                         item = currentItem,
@@ -196,11 +197,12 @@ private fun CountdownCard(
     formatDate: (Long) -> String,
     onClick: () -> Unit
 ) {
-    val cardColors = listOf(
-        Color(0xFF7B1FA2), MaterialTheme.colorScheme.primary, Color(0xFF2E7D32),
-        Color(0xFFE65100), Color(0xFF00838F), Color(0xFFC62828)
-    )
-    val themeColor = cardColors[kotlin.math.abs(item.item.title.hashCode()) % cardColors.size]
+    val colorGroup = when {
+        item.daysRemaining in 0..2 -> listOf(Color(0xFFC62828), Color(0xFFD32F2F), Color(0xFFB71C1C))
+        item.daysRemaining in 3..5 -> listOf(Color(0xFFE65100), Color(0xFFF57C00), Color(0xFFEF6C00))
+        else -> listOf(Color(0xFF7B1FA2), Color(0xFFC4A8E8), Color(0xFFF0A0B0), Color(0xFF6A1B9A), Color(0xFF2E7D32), Color(0xFF1565C0), Color(0xFF00838F), Color(0xFFA0AAE8))
+    }
+    val themeColor = colorGroup[kotlin.math.abs(item.item.title.hashCode()) % colorGroup.size]
 
     Card(
         modifier = Modifier
@@ -211,7 +213,7 @@ private fun CountdownCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Box(Modifier.size(48.dp).clip(CircleShape).background(Brush.linearGradient(listOf(themeColor.copy(alpha = 0.15f), themeColor.copy(alpha = 0.05f)))), contentAlignment = Alignment.Center) {
+            Box(Modifier.width(72.dp).height(48.dp).clip(RoundedCornerShape(14.dp)).background(Brush.linearGradient(listOf(themeColor.copy(alpha = 0.15f), themeColor.copy(alpha = 0.05f)))), contentAlignment = Alignment.Center) {
                 Text("${item.daysRemaining}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = themeColor)
             }
             Spacer(modifier = Modifier.height(10.dp))
@@ -376,15 +378,18 @@ private fun EditCountdownDialogContent(
         )
     }
 
-    if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("删除倒数日") },
-            text = { Text("确定要删除「${item.item.title}」吗？") },
-            confirmButton = { TextButton(onClick = { onDelete(); showDeleteConfirm = false }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("删除") } },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") } }
-        )
-    }
+    // 删除确认 - 使用统一 DeleteConfirmOverlay
+    DeleteConfirmOverlay(
+        visible = showDeleteConfirm,
+        title = "确认删除",
+        message = "确定要删除「${item.item.title}」吗？",
+        cancelColor = MaterialTheme.colorScheme.primary,
+        onConfirm = {
+            onDelete()
+            showDeleteConfirm = false
+        },
+        onDismiss = { showDeleteConfirm = false }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -446,10 +451,12 @@ private fun AnimatedDatePickerOverlay(
                     shadowElevation = 0.dp
                 ) {
                     Column {
-                        DatePicker(
-                            state = datePickerState,
-                            colors = DatePickerDefaults.colors(containerColor = Color.White)
-                        )
+                        MaterialTheme(shapes = MaterialTheme.shapes.copy(extraSmall = RoundedCornerShape(12.dp))) {
+                            DatePicker(
+                                state = datePickerState,
+                                colors = DatePickerDefaults.colors(containerColor = Color.White)
+                            )
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(end = 12.dp, bottom = 12.dp),
                             horizontalArrangement = Arrangement.End
