@@ -135,7 +135,7 @@ Snote/
 
 ## ☕ 赞赏
 
-如果觉得 Snote 对你有帮助，欢迎请我喝杯奶茶，谢谢。
+如果觉得 Snote 对你有帮助，欢迎请我喝杯奶茶，谢谢 ✨
 
 <p align="center">
   <img src="assets/donate-wechat.png" alt="微信赞赏" width="240">
