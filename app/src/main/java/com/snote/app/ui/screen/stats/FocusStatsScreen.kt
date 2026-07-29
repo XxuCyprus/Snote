@@ -3,6 +3,8 @@ package com.snote.app.ui.screen.stats
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +20,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,7 +45,7 @@ fun FocusStatsScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = LocalDate.parse(selectedDate)
-            .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            .atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
     )
 
     LaunchedEffect(Unit) { viewModel.loadData() }
@@ -214,20 +217,79 @@ fun FocusStatsScreen(
     }
 
     if (showDatePicker) {
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
+        val animProgress = remember { Animatable(0f) }
+        var isVisible by remember { mutableStateOf(true) }
+        var shouldConfirm by remember { mutableStateOf(false) }
+
+        LaunchedEffect(Unit) {
+            animProgress.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 400f))
+        }
+        LaunchedEffect(isVisible) {
+            if (!isVisible) {
+                animProgress.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 500f))
+                if (shouldConfirm) {
                     datePickerState.selectedDateMillis?.let { millis ->
                         val date = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate().toString()
                         viewModel.setDate(date)
                     }
-                    showDatePicker = false
-                }) { Text("确定") }
-            },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("取消") } }
-        ) {
-            DatePicker(state = datePickerState)
+                }
+                showDatePicker = false
+            }
+        }
+
+        val v = animProgress.value
+        Box(Modifier.fillMaxSize()) {
+            Box(
+                Modifier.fillMaxSize()
+                    .graphicsLayer { alpha = v * 0.5f }
+                    .background(Color.Black)
+                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {
+                        shouldConfirm = false
+                        isVisible = false
+                    }
+            )
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(Modifier.graphicsLayer {
+                    alpha = v
+                    val s = 0.5f + 0.5f * v; scaleX = s; scaleY = s
+                }) {
+                    Surface(
+                        modifier = Modifier.widthIn(max = 352.dp).heightIn(max = 560.dp),
+                        shape = RoundedCornerShape(28.dp),
+                        color = Color.White,
+                        tonalElevation = 0.dp,
+                        shadowElevation = 0.dp
+                    ) {
+                        Column {
+                            MaterialTheme(shapes = MaterialTheme.shapes.copy(extraSmall = RoundedCornerShape(12.dp))) {
+                                DatePicker(
+                                    state = datePickerState,
+                                    colors = DatePickerDefaults.colors(
+                                        containerColor = Color.White,
+                                        headlineContentColor = MaterialTheme.colorScheme.primary,
+                                        titleContentColor = MaterialTheme.colorScheme.primary,
+                                        navigationContentColor = MaterialTheme.colorScheme.primary
+                                    )
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(end = 12.dp, bottom = 12.dp),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                TextButton(onClick = {
+                                    shouldConfirm = false
+                                    isVisible = false
+                                }) { Text("取消", color = MaterialTheme.colorScheme.primary) }
+                                Spacer(Modifier.width(8.dp))
+                                TextButton(onClick = {
+                                    shouldConfirm = true
+                                    isVisible = false
+                                }) { Text("确定", color = MaterialTheme.colorScheme.primary) }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

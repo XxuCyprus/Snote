@@ -15,9 +15,6 @@
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
 
-    <!-- 拍照权限 - 用于从相机导入照片 -->
-    <uses-permission android:name="android.permission.CAMERA" />
-
     <!-- 录音权限 - App内录音功能 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 

@@ -313,7 +313,14 @@ private fun EditCountdownDialogContent(
     var selectedDateMs by remember { mutableStateOf(item.item.targetDate) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedDateMs)
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = Instant.ofEpochMilli(selectedDateMs)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+            .atStartOfDay(java.time.ZoneOffset.UTC)
+            .toInstant()
+            .toEpochMilli()
+    )
 
     val displayDate = java.text.SimpleDateFormat("yyyy年MM月dd日", java.util.Locale.getDefault()).format(java.util.Date(selectedDateMs))
 
@@ -445,7 +452,7 @@ private fun AnimatedDatePickerOverlay(
                 }
             ) {
                 Surface(
-                    modifier = Modifier.widthIn(max = 352.dp).heightIn(max = 480.dp),
+                    modifier = Modifier.widthIn(max = 352.dp).heightIn(max = 560.dp),
                     shape = RoundedCornerShape(28.dp),
                     color = Color.White,
                     tonalElevation = 0.dp,
