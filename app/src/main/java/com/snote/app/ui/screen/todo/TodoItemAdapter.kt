@@ -304,6 +304,7 @@ class TodoItemAdapter(
                 val pos = mp.currentPosition
                 progressAudio.max = if (dur > 0) dur else 1
                 progressAudio.progress = pos
+                progressAudio.progressTintList = android.content.res.ColorStateList.valueOf(themeColor)
                 progressAudio.visibility = View.VISIBLE
                 audioTimeRow.visibility = View.VISIBLE
                 tvAudioCurrent.text = formatTime(pos)

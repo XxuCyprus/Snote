@@ -23,7 +23,7 @@
 - **文件导入** — 支持 Word、PDF、Excel 导入，通过系统应用打开查看
 - **内容重命名** — 视频、音频、文件支持自定义命名
 - **星标过滤** — 标记重点内容，一键筛选
-- **全文本搜索** — 搜笔记本名、章节名、文字内容，同时支持按视频/音频/文件名称搜索
+- **全文本搜索** — 三类匹配：标题匹配（笔记本名 / 章节名）、内容匹配（文字内容）、文件名匹配（视频 / 音频 / 文件名称），支持按匹配类型筛选
 
 ### ✅ 待办中心
 - **双区管理** — 未完成 / 已完成分区，支持复选框完成确认与撤销，数据跨区迁移完整保留
@@ -37,6 +37,7 @@
 
 ### ⏳ 倒数日
 - **两列网格** — 倒计时卡片一目了然
+- **动态配色** — 数字颜色按剩余天数自动变化，紧急程度一目了然
 - **日期选择** — 点击 FAB 添加，日历选择目标日期
 - **编辑管理** — 点击卡片可修改名称 / 日期，内设删除按钮
 
@@ -101,31 +102,37 @@ git clone https://github.com/XxuCyprus/Snote.git
 ```
 Snote/
 ├── app/                          # 主应用模块
-│   └── src/main/java/com/snote/app/
-│       ├── data/                 # 数据模型 & 仓库 & 文件管理
-│       │   ├── model/             # 数据模型
-│       │   ├── repository/        # 仓库层
-│       │   └── storage/           # 文件存储
-│       ├── di/                   # Hilt 依赖注入
-│       └── ui/                   # Compose UI 层
-│           ├── screen/main/      # 主页仪表盘（四模块入口）
-│           ├── screen/home/      # 我的笔记（笔记本列表）
-│           ├── screen/todo/      # 待办中心
-│           ├── screen/stats/     # 专注统计
-│           ├── screen/countdown/ # 倒数日
-│           ├── screen/reader/    # 阅读页（章节 + 内容）
-│           ├── screen/settings/  # 设置页
-│           ├── screen/search/    # 搜索页
-│           ├── screen/permission/  # 权限门控页
-│           ├── navigation/       # 导航图
-│           └── theme/            # Material 3 主题
+│   ├── build.gradle.kts
+│   └── src/main/
+│       ├── AndroidManifest.xml
+│       ├── res/                   # 布局与资源文件
+│       └── java/com/snote/app/
+│           ├── data/              # 数据模型 & 仓库 & 文件管理
+│           │   ├── model/          # 数据模型
+│           │   ├── repository/     # 仓库层
+│           │   └── storage/        # 文件存储
+│           ├── di/                # Hilt 依赖注入
+│           └── ui/                # Compose UI 层
+│               ├── screen/main/   # 主页仪表盘（四模块入口）
+│               ├── screen/home/   # 我的笔记（笔记本列表）
+│               ├── screen/todo/   # 待办中心
+│               ├── screen/stats/  # 专注统计
+│               ├── screen/countdown/ # 倒数日
+│               ├── screen/reader/ # 阅读页（章节 + 内容）
+│               ├── screen/settings/ # 设置页
+│               ├── screen/search/ # 搜索页
+│               ├── screen/permission/ # 权限门控页
+│               ├── navigation/    # 导航图
+│               └── theme/         # Material 3 主题
 ├── image/                        # 图片编辑器独立模块
 │   └── src/main/java/me/minetsh/imaging/
-│       ├── core/                 # 核心编辑逻辑（涂鸦/贴纸/裁切/动画）
-│       └── view/                 # 自定义 View 组件
-├── assets/                        # 杂项资源
+│       ├── core/                  # 核心编辑逻辑（涂鸦/贴纸/裁切/动画）
+│       └── view/                  # 自定义 View 组件
+├── assets/                       # 杂项资源
 ├── build.gradle.kts
 ├── gradle.properties
+├── LICENSE.md
+├── SECURITY.md
 └── settings.gradle.kts
 ```
 

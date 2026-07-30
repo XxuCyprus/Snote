@@ -32,6 +32,7 @@ fun SearchScreen(
     val query by viewModel.query.collectAsState()
     val results by viewModel.results.collectAsState()
     val hasSearched by viewModel.hasSearched.collectAsState()
+    val activeFilters by viewModel.activeFilters.collectAsState()
 
     Scaffold(
         topBar = {
@@ -122,16 +123,100 @@ fun SearchScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 item {
-                    Text(
-                        text = "找到 ${results.size} 条结果",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(end = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "找到 ${results.size} 条结果",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        FilterChip(
+                            selected = "content" in activeFilters,
+                            onClick = { viewModel.toggleFilter("content") },
+                            label = {
+                                Text(
+                                    text = "内容匹配",
+                                    fontSize = 10.sp
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = Color.White,
+                                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                selectedLabelColor = MaterialTheme.colorScheme.primary
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                borderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                selectedBorderColor = MaterialTheme.colorScheme.primary,
+                                enabled = true,
+                                selected = "content" in activeFilters
+                            ),
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.height(26.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        FilterChip(
+                            selected = "title" in activeFilters,
+                            onClick = { viewModel.toggleFilter("title") },
+                            label = {
+                                Text(
+                                    text = "标题匹配",
+                                    fontSize = 10.sp
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = Color.White,
+                                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                selectedLabelColor = MaterialTheme.colorScheme.primary
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                borderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                selectedBorderColor = MaterialTheme.colorScheme.primary,
+                                enabled = true,
+                                selected = "title" in activeFilters
+                            ),
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.height(26.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        FilterChip(
+                            selected = "file" in activeFilters,
+                            onClick = { viewModel.toggleFilter("file") },
+                            label = {
+                                Text(
+                                    text = "文件名匹配",
+                                    fontSize = 10.sp
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = Color.White,
+                                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                selectedLabelColor = MaterialTheme.colorScheme.primary
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                borderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                selectedBorderColor = MaterialTheme.colorScheme.primary,
+                                enabled = true,
+                                selected = "file" in activeFilters
+                            ),
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.height(26.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
                 }
 
+                val filteredResults = results.filter { it.matchType in activeFilters }
+
                 itemsIndexed(
-                    items = results,
+                    items = filteredResults,
                     key = { index, result -> "${result.notebookId}_${result.chapterId}_$index" }
                 ) { _, result ->
                     SearchResultCard(
@@ -171,7 +256,11 @@ fun SearchResultCard(
                     onClick = {},
                     label = {
                         Text(
-                            text = if (result.matchType == "title") "标题匹配" else "内容匹配",
+                            text = when (result.matchType) {
+                                "title" -> "标题匹配"
+                                "content" -> "内容匹配"
+                                else -> "文件名匹配"
+                            },
                             fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -180,7 +269,8 @@ fun SearchResultCard(
                         containerColor = Color.White
                     ),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-                    modifier = Modifier.height(22.dp)
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.height(26.dp)
                 )
             }
 

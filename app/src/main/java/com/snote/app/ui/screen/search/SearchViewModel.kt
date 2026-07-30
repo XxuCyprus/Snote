@@ -27,6 +27,10 @@ class SearchViewModel @Inject constructor(
     private val _hasSearched = MutableStateFlow(false)
     val hasSearched: StateFlow<Boolean> = _hasSearched.asStateFlow()
 
+    // 筛选类型（多选），默认全部选中
+    private val _activeFilters = MutableStateFlow(setOf("title", "content", "file"))
+    val activeFilters: StateFlow<Set<String>> = _activeFilters.asStateFlow()
+
     /**
      * 更新搜索关键词
      */
@@ -55,5 +59,13 @@ class SearchViewModel @Inject constructor(
         _query.value = ""
         _results.value = emptyList()
         _hasSearched.value = false
+    }
+
+    /**
+     * 切换筛选类型
+     */
+    fun toggleFilter(type: String) {
+        val current = _activeFilters.value
+        _activeFilters.value = if (type in current) current - type else current + type
     }
 }
